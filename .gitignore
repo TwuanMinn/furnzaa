@@ -5,6 +5,7 @@
 
 # next.js
 /.next/
+/.next-build/
 /out/
 /build
 /dist
@@ -26,6 +27,7 @@ tsconfig.tsbuildinfo
 /test-results/
 /playwright-report/
 /playwright/.cache/
+/playwright/.auth/
 
 # claude (local-only session settings)
 .claude/settings.local.json

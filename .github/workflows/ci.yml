@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-typecheck:
+    name: Typecheck & lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+
+  e2e:
+    name: Playwright smoke suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+
+      # Applies supabase/migrations + seed.sql on the fresh stack.
+      - name: Start local Supabase
+        run: npx supabase start
+
+      # The app uses the new-style API keys (sb_publishable_… / sb_secret_…),
+      # same as the local dev .env.
+      - name: Write .env from Supabase status
+        run: |
+          eval "$(npx supabase status -o env | grep -E '^(API_URL|PUBLISHABLE_KEY|SECRET_KEY)=')"
+          cat > .env <<EOF
+          NEXT_PUBLIC_SUPABASE_URL="$API_URL"
+          NEXT_PUBLIC_SUPABASE_ANON_KEY="$PUBLISHABLE_KEY"
+          SUPABASE_SERVICE_ROLE_KEY="$SECRET_KEY"
+          NEXT_PUBLIC_APP_URL="http://localhost:3000"
+          SEED_ADMIN_EMAIL="admin@furnza.local"
+          SEED_ADMIN_PASSWORD="ChangeMe!2026"
+          SEED_ADMIN_NAME="Admin"
+          CRON_SECRET="ci-only-cron-secret"
+          MARKETING_EMAIL_PROVIDER="console"
+          MARKETING_SMS_PROVIDER="console"
+          MARKETING_WHATSAPP_PROVIDER="console"
+          EOF
+
+      - name: Seed demo data
+        run: npm run seed
+
+      - name: Build
+        run: npm run build
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      # playwright.config.ts starts `npm run start` itself (webServer) in CI.
+      - name: Run smoke suite
+        run: npx playwright test
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

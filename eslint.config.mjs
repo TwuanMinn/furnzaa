@@ -10,8 +10,11 @@ const eslintConfig = [
   {
     ignores: [
       ".next/**",
+      ".next-build/**",
       "node_modules/**",
       "next-env.d.ts",
+      "playwright-report/**",
+      "test-results/**",
       "src/lib/supabase/database.types.ts",
     ],
   },

@@ -2,6 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  // Override the build output dir (e.g. NEXT_DIST_DIR=.next-build) so a
+  // production build can run while `next dev` holds .next on the same machine.
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   // React Compiler (Next 16, top-level) — auto-memoizes components. Turbopack
   // uses its built-in Babel for this, so no extra dependency is required.
   reactCompiler: true,
