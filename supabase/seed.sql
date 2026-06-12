@@ -1,0 +1,7 @@
+-- Reference data (roles, permissions, role_permissions, organization_settings)
+-- is seeded via migration 0003_seed_reference.sql so it is always present after
+-- `supabase db reset`.
+--
+-- Demo data + auth users (default Admin, demo staff, customers, orders, messages)
+-- are seeded by `npm run seed` (scripts/seed.ts), which uses the Supabase Admin
+-- API to create real auth users with passwords. Nothing to do in this file.

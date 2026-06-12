@@ -1,0 +1,44 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+
+# next.js
+/.next/
+/out/
+/build
+/dist
+next-env.d.ts
+
+# env
+.env
+.env*.local
+
+# supabase (local stack artifacts; keep migrations + config.toml)
+/supabase/.branches
+/supabase/.temp
+/supabase/.env
+
+# typescript
+tsconfig.tsbuildinfo
+
+# playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/
+
+# claude (local-only session settings)
+.claude/settings.local.json
+
+# logs / temp
+*.log
+install.log
+supabase-start.log
+
+# os / editor
+.DS_Store
+Thumbs.db
+*.pem
+.vscode/*
+!.vscode/extensions.json
+.idea
