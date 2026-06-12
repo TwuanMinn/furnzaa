@@ -102,12 +102,17 @@ export function FeedbackFormDialog({
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  // Depend on the first VALUES, not the config arrays: a background RSC
+  // re-render (router.refresh, server action) rebuilds `config` with fresh
+  // array identities, and an identity dep would wipe the form mid-typing.
+  const defaultCategory = config.categories[0] ?? "Other";
+  const defaultChannel = config.channels[0] ?? "In person";
   useEffect(() => {
     if (!open) return;
     setRating(0);
     setComments("");
-    setCategory(config.categories[0] ?? "Other");
-    setChannel(config.channels[0] ?? "In person");
+    setCategory(defaultCategory);
+    setChannel(defaultChannel);
     setSeverity("low");
     setCustomer(null);
     setCustomerQuery("");
@@ -121,7 +126,7 @@ export function FeedbackFormDialog({
       prev.forEach((p) => URL.revokeObjectURL(p.preview));
       return [];
     });
-  }, [open, config.categories, config.channels]);
+  }, [open, defaultCategory, defaultChannel]);
 
   // Debounced customer lookup against the Hub's finder endpoint.
   useEffect(() => {
