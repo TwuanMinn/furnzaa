@@ -1,8 +1,18 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { PackagePlus, PackageSearch } from "lucide-react";
+import {
+  Download,
+  Loader2,
+  PackagePlus,
+  PackageSearch,
+  RotateCcw,
+  Trash2,
+  UserPlus,
+} from "lucide-react";
+import { toast } from "sonner";
 
 import { DataTable, type DataTableColumn } from "@/components/datatable/data-table";
 import { useDataTable } from "@/lib/datatable/use-data-table";
@@ -21,7 +31,8 @@ import type {
   PrinterDef,
 } from "@/lib/orders/config";
 import type { StaffOption } from "@/app/api/staff/route";
-import { PAYMENT_STATUSES } from "@/lib/orders/schemas";
+import { PAYMENT_STATUSES, type BulkOrderAction } from "@/lib/orders/schemas";
+import { OrdersBulkActionDialog } from "./bulk-action-dialog";
 
 interface OrdersTableProps {
   statuses: OrderStatusDef[];
@@ -47,6 +58,40 @@ export function OrdersTable({ statuses, priorities, printers, materials }: Order
       return body.ok ? (body.data?.staff ?? []) : [];
     },
   });
+
+  const [bulkState, setBulkState] = useState<{ action: BulkOrderAction; ids: string[] } | null>(
+    null,
+  );
+  const [exportingSelected, setExportingSelected] = useState(false);
+
+  // Recycle-bin view: drives the dataset's `deleted` filter (shows is_active=false
+  // rows). Derived from the live filter so it can't desync from "Clear filters".
+  const showDeleted = table.filters["deleted"] === "true";
+
+  async function exportSelected(ids: string[], clear: () => void) {
+    setExportingSelected(true);
+    try {
+      const params = new URLSearchParams({ format: "csv", f_ids: ids.join(",") });
+      const res = await fetch(`/api/export/orders?${params}`);
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(body?.error ?? `Export failed (${res.status})`);
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `orders-selected-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Exported ${ids.length} order(s)`);
+      clear();
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Export failed");
+    } finally {
+      setExportingSelected(false);
+    }
+  }
 
   const statusMap = new Map(statuses.map((s) => [s.key, s]));
   const priorityMap = new Map(priorities.map((p) => [p.key, p]));
@@ -196,25 +241,97 @@ export function OrdersTable({ statuses, priorities, printers, materials }: Order
   ];
 
   return (
-    <DataTable
-      table={table}
-      columns={columns}
-      getRowId={(r) => r.id}
-      filterDefs={filters}
-      searchPlaceholder="Search code, customer, phone, email…"
-      exportDataset="orders"
-      importDataset="orders"
-      onRowClick={(r) => router.push(`/orders/${r.id}`)}
-      emptyIcon={PackageSearch}
-      emptyTitle="No orders found"
-      emptyDescription="Adjust the search or filters, create an order, or import historical orders from CSV."
-      toolbar={
-        <Can permission="orders.create">
-          <Button size="sm" onClick={() => router.push("/orders/new")}>
-            <PackagePlus /> New order
-          </Button>
-        </Can>
-      }
-    />
+    <>
+      <DataTable
+        table={table}
+        columns={columns}
+        getRowId={(r) => r.id}
+        filterDefs={filters}
+        searchPlaceholder="Search code, customer, phone, email…"
+        exportDataset="orders"
+        importDataset="orders"
+        selectable
+        onRowClick={(r) => router.push(`/orders/${r.id}`)}
+        emptyIcon={PackageSearch}
+        emptyTitle="No orders found"
+        emptyDescription="Adjust the search or filters, create an order, or import historical orders from CSV."
+        bulkActions={(ids, clear) => (
+          <>
+            {showDeleted ? (
+              <Can permission="orders.delete">
+                <Button
+                  size="sm"
+                  variant="default"
+                  onClick={() => setBulkState({ action: "restore", ids })}
+                >
+                  <RotateCcw /> Restore
+                </Button>
+              </Can>
+            ) : (
+              <Can permission="orders.assign">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setBulkState({ action: "assign", ids })}
+                >
+                  <UserPlus /> Assign
+                </Button>
+              </Can>
+            )}
+            <Can permission="orders.export">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={exportingSelected}
+                onClick={() => void exportSelected(ids, clear)}
+              >
+                {exportingSelected ? <Loader2 className="animate-spin" /> : <Download />} Export
+              </Button>
+            </Can>
+            {!showDeleted ? (
+              <Can permission="orders.delete">
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  onClick={() => setBulkState({ action: "delete", ids })}
+                >
+                  <Trash2 /> Delete
+                </Button>
+              </Can>
+            ) : null}
+          </>
+        )}
+        toolbar={
+          <>
+            <Can permission="orders.delete">
+              <Button
+                size="sm"
+                variant={showDeleted ? "secondary" : "outline"}
+                onClick={() => table.setFilter("deleted", showDeleted ? "" : "true")}
+              >
+                {showDeleted ? <RotateCcw /> : <Trash2 />}
+                {showDeleted ? "Show active" : "Recycle bin"}
+              </Button>
+            </Can>
+            <Can permission="orders.create">
+              <Button size="sm" onClick={() => router.push("/orders/new")}>
+                <PackagePlus /> New order
+              </Button>
+            </Can>
+          </>
+        }
+      />
+      <OrdersBulkActionDialog
+        state={bulkState}
+        staff={staffData ?? []}
+        onOpenChange={(o) => {
+          if (!o) setBulkState(null);
+        }}
+        onDone={() => {
+          table.clearSelection();
+          table.refresh();
+        }}
+      />
+    </>
   );
 }

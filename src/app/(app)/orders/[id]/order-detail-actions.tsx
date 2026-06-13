@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRightLeft, FileText, Loader2, Pencil, Trash2 } from "lucide-react";
+import { ArrowRightLeft, FileText, Loader2, Pencil, RotateCcw, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,7 @@ import {
 import { Can } from "@/lib/rbac/context";
 import {
   getReceiptUrlAction,
+  restoreOrderAction,
   softDeleteOrderAction,
   updateOrderStatusAction,
 } from "@/lib/orders/actions";
@@ -110,6 +111,21 @@ export function OrderDetailActions({
     }
   }
 
+  async function restoreOrder() {
+    setBusy("restore");
+    try {
+      const result = await restoreOrderAction(orderId);
+      if (result.ok) {
+        toast.success(`Order ${orderCode} restored`);
+        router.refresh();
+      } else {
+        toast.error(result.error);
+      }
+    } finally {
+      setBusy(null);
+    }
+  }
+
   return (
     <div className="flex flex-wrap items-center gap-2">
       {hasReceipt ? (
@@ -142,7 +158,19 @@ export function OrderDetailActions({
             </Button>
           </Can>
         </>
-      ) : null}
+      ) : (
+        <Can permission="orders.delete">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={busy === "restore"}
+            onClick={() => void restoreOrder()}
+          >
+            {busy === "restore" ? <Loader2 className="animate-spin" /> : <RotateCcw />}
+            Restore order
+          </Button>
+        </Can>
+      )}
 
       <Dialog open={statusOpen} onOpenChange={(o) => busy !== "status" && setStatusOpen(o)}>
         <DialogContent className="sm:max-w-sm">
@@ -197,8 +225,8 @@ export function OrderDetailActions({
           <AlertDialogHeader>
             <AlertDialogTitle>Delete order {orderCode}?</AlertDialogTitle>
             <AlertDialogDescription>
-              The order is removed from lists but kept in history and analytics (soft delete). An
-              administrator can restore it from the database if needed.
+              The order is removed from lists but kept in history and analytics (soft delete). You
+              can bring it back anytime from the Orders “Recycle bin” view or this page.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

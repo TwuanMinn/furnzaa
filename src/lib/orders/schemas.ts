@@ -95,6 +95,21 @@ export const orderStatusChangeSchema = z.object({
 });
 export type OrderStatusChangeInput = z.infer<typeof orderStatusChangeSchema>;
 
+/** Bulk actions over a checkbox selection in the Orders list. */
+export const BULK_ORDER_ACTIONS = ["delete", "restore", "assign"] as const;
+export type BulkOrderAction = (typeof BULK_ORDER_ACTIONS)[number];
+
+export const bulkOrderActionSchema = z.object({
+  action: z.enum(BULK_ORDER_ACTIONS),
+  orderIds: z
+    .array(z.string().uuid())
+    .min(1, "Select at least one order")
+    .max(500, "Select up to 500 orders at once"),
+  /** assign only: a staff user id, or null to unassign. */
+  assignedStaffId: z.string().uuid().nullable().optional(),
+});
+export type BulkOrderActionInput = z.infer<typeof bulkOrderActionSchema>;
+
 export const PAYMENT_STATUSES = [
   { value: "paid", label: "Paid" },
   { value: "unpaid", label: "Unpaid" },

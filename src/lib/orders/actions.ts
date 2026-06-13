@@ -10,8 +10,10 @@ import { handleOrderCrm } from "@/lib/crm/hooks";
 import { toCents } from "@/lib/format";
 import { getOrderConfig, type OrderConfig } from "./config";
 import {
+  bulkOrderActionSchema,
   orderFormSchema,
   orderStatusChangeSchema,
+  type BulkOrderActionInput,
   type OrderFormInput,
   type OrderStatusChangeInput,
 } from "./schemas";
@@ -640,6 +642,185 @@ export async function softDeleteOrderAction(orderId: string): Promise<SimpleResu
     });
 
     return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Restore a soft-deleted order (orders.delete — the inverse of soft delete). */
+export async function restoreOrderAction(orderId: string): Promise<SimpleResult> {
+  try {
+    const actor = await requirePermission("orders.delete");
+    const before = await getOrderSnapshot(orderId);
+    if (!before) return { ok: false, error: "Order not found." };
+    if (before.is_active) return { ok: false, error: "Order is not deleted." };
+
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("orders")
+      .update(dbUpdate("orders", { is_active: true, deleted_at: null, updated_by: actor.id }))
+      .eq("id", orderId);
+    if (error) throw new Error(error.message);
+
+    void logActivity({
+      actor,
+      action: "order.restore",
+      module: "orders",
+      targetType: "order",
+      targetId: orderId,
+      summary: `Restored order ${before.order_code}`,
+      before: { is_active: false },
+      after: { is_active: true },
+    });
+
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+type BulkOrderRow = {
+  id: string;
+  order_code: string;
+  is_active: boolean;
+  assigned_staff_id: string | null;
+};
+
+/**
+ * Bulk actions over a checkbox selection in the Orders list:
+ *   delete → SOFT delete (orders.delete): is_active=false + deleted_at. The
+ *            idempotency stamps (sale_movements_at / crm_applied_at) are left
+ *            untouched, so stock/CRM effects are never re-run or reversed —
+ *            same contract as the per-order delete.
+ *   assign → set assigned_staff_id (orders.assign); null = unassign. The new
+ *            assignee is notified per order, exactly like editing one order.
+ * RLS scopes which rows the actor can touch; ids they can't see are skipped.
+ * One activity-log row per affected order (mirrors the Users bulk pattern).
+ */
+export async function bulkOrderActionsAction(
+  input: BulkOrderActionInput,
+): Promise<{ ok: true; affected: number; skipped: string[] } | { ok: false; error: string }> {
+  try {
+    const parsed = bulkOrderActionSchema.safeParse(input);
+    if (!parsed.success) {
+      return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid input" };
+    }
+    const { action, orderIds, assignedStaffId } = parsed.data;
+    // Restore is the inverse of delete, so it shares the orders.delete gate.
+    const actor = await requirePermission(action === "assign" ? "orders.assign" : "orders.delete");
+
+    const supabase = await createClient();
+    const { data: rowsRaw, error: readError } = await supabase
+      .from("orders")
+      .select("id, order_code, is_active, assigned_staff_id")
+      .in("id", orderIds);
+    if (readError) throw new Error(readError.message);
+
+    const rows = asRows<BulkOrderRow>(rowsRaw);
+    const visible = new Set(rows.map((r) => r.id));
+    const skipped: string[] = [];
+    for (const id of orderIds) if (!visible.has(id)) skipped.push("an order you can’t access");
+
+    if (action === "delete") {
+      for (const r of rows) if (!r.is_active) skipped.push(`${r.order_code} (already deleted)`);
+      const targets = rows.filter((r) => r.is_active);
+      if (targets.length > 0) {
+        const { error } = await supabase
+          .from("orders")
+          .update(
+            dbUpdate("orders", {
+              is_active: false,
+              deleted_at: new Date().toISOString(),
+              updated_by: actor.id,
+            }),
+          )
+          .in("id", targets.map((r) => r.id));
+        if (error) throw new Error(error.message);
+        for (const r of targets) {
+          void logActivity({
+            actor,
+            action: "order.bulk_delete",
+            module: "orders",
+            targetType: "order",
+            targetId: r.id,
+            summary: `Bulk-deleted order ${r.order_code}`,
+            before: { is_active: true },
+            after: { is_active: false },
+          });
+        }
+      }
+      return { ok: true, affected: targets.length, skipped };
+    }
+
+    if (action === "restore") {
+      for (const r of rows) if (r.is_active) skipped.push(`${r.order_code} (not deleted)`);
+      const targets = rows.filter((r) => !r.is_active);
+      if (targets.length > 0) {
+        const { error } = await supabase
+          .from("orders")
+          .update(dbUpdate("orders", { is_active: true, deleted_at: null, updated_by: actor.id }))
+          .in("id", targets.map((r) => r.id));
+        if (error) throw new Error(error.message);
+        for (const r of targets) {
+          void logActivity({
+            actor,
+            action: "order.bulk_restore",
+            module: "orders",
+            targetType: "order",
+            targetId: r.id,
+            summary: `Restored order ${r.order_code}`,
+            before: { is_active: false },
+            after: { is_active: true },
+          });
+        }
+      }
+      return { ok: true, affected: targets.length, skipped };
+    }
+
+    // action === "assign"
+    const newAssignee = assignedStaffId ?? null;
+    if (newAssignee) {
+      const { data: staffRaw } = await supabase
+        .from("users")
+        .select("id, is_active")
+        .eq("id", newAssignee)
+        .maybeSingle();
+      const staff = asRow<{ id: string; is_active: boolean }>(staffRaw);
+      if (!staff || !staff.is_active) {
+        return { ok: false, error: "Pick an active staff member to assign." };
+      }
+    }
+    if (rows.length > 0) {
+      const { error } = await supabase
+        .from("orders")
+        .update(dbUpdate("orders", { assigned_staff_id: newAssignee, updated_by: actor.id }))
+        .in("id", rows.map((r) => r.id));
+      if (error) throw new Error(error.message);
+      for (const r of rows) {
+        void logActivity({
+          actor,
+          action: "order.bulk_assign",
+          module: "orders",
+          targetType: "order",
+          targetId: r.id,
+          summary: newAssignee
+            ? `Bulk-assigned order ${r.order_code}`
+            : `Bulk-unassigned order ${r.order_code}`,
+          before: { assigned_staff_id: r.assigned_staff_id },
+          after: { assigned_staff_id: newAssignee },
+        });
+        if (newAssignee && newAssignee !== r.assigned_staff_id) {
+          void notifyOrderAssigned({
+            orderId: r.id,
+            orderCode: r.order_code,
+            assigneeId: newAssignee,
+            actorId: actor.id,
+            actorName: actor.fullName,
+          });
+        }
+      }
+    }
+    return { ok: true, affected: rows.length, skipped };
   } catch (e) {
     return fail(e);
   }

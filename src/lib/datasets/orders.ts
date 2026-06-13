@@ -103,6 +103,12 @@ export async function fetchOrdersPage(parsed: ParsedListQuery) {
   if (from) query = query.gte("buying_date", from);
   if (to) query = query.lte("buying_date", to);
 
+  // Restrict to a specific set of ids (powers "Export selected rows").
+  if (parsed.filters["ids"]) {
+    const ids = parsed.filters["ids"].split(",").filter(Boolean).slice(0, 1000);
+    if (ids.length > 0) query = query.in("id", ids);
+  }
+
   if (parsed.cursor) {
     query = query.or(keysetOrExpression(parsed.cursor, parsed.sort, parsed.ascending));
   }
