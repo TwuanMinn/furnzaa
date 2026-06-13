@@ -21,7 +21,7 @@ next-env.d.ts
 /supabase/.env
 
 # typescript
-tsconfig.tsbuildinfo
+*.tsbuildinfo
 
 # playwright
 /test-results/
