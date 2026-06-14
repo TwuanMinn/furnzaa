@@ -3,12 +3,11 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { asRow, asRows, dbInsert, dbUpdate } from "@/lib/supabase/types";
 import {
-  ForbiddenError,
-  UnauthorizedError,
   requirePermission,
   requireUser,
   type SessionUser,
 } from "@/lib/rbac/guards";
+import { fail, type ActionResult } from "@/lib/actions/result";
 import { logActivity } from "@/lib/activity/log";
 import { sendNotification } from "@/lib/notifications/service";
 import { getOrgSettings } from "@/lib/settings/config";
@@ -32,16 +31,7 @@ import {
  * scopes staff to records they submitted or are assigned.
  */
 
-export type FeedbackResult<T = undefined> =
-  | (T extends undefined ? { ok: true } : { ok: true; data: T })
-  | { ok: false; error: string };
-
-function fail(e: unknown): { ok: false; error: string } {
-  if (e instanceof UnauthorizedError) return { ok: false, error: "You are not signed in." };
-  if (e instanceof ForbiddenError)
-    return { ok: false, error: "You don't have permission to do that." };
-  return { ok: false, error: e instanceof Error ? e.message : "Something went wrong" };
-}
+export type FeedbackResult<T = undefined> = ActionResult<T>;
 
 function firstIssue(error: { issues: { message: string }[] }) {
   return error.issues[0]?.message ?? "Invalid input";

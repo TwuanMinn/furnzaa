@@ -52,6 +52,9 @@ export interface DataTableProps<T> {
   emptyAction?: ReactNode;
   /** Extra toolbar actions (e.g. "New order"). */
   toolbar?: ReactNode;
+  viewMode?: "table" | "grid" | "compact" | "performance";
+  renderGrid?: (rows: T[], onRowClick?: (row: T) => void) => ReactNode;
+  viewToggle?: ReactNode;
 }
 
 const HIDE_CLASS = {
@@ -82,6 +85,9 @@ export function DataTable<T>({
   emptyIcon = Inbox,
   emptyAction,
   toolbar,
+  viewMode = "table",
+  renderGrid,
+  viewToggle,
 }: DataTableProps<T>) {
   const reduce = useReducedMotion();
   const rowIds = table.rows.map(getRowId);
@@ -103,6 +109,7 @@ export function DataTable<T>({
         importDataset={importDataset}
         exportParams={table.exportParams}
         onImported={table.refresh}
+        viewToggle={viewToggle}
       >
         {toolbar}
       </DataTableToolbar>
@@ -145,6 +152,8 @@ export function DataTable<T>({
             }
           />
         </div>
+      ) : (viewMode === "grid" || viewMode === "performance") && renderGrid ? (
+        renderGrid(table.rows, onRowClick)
       ) : (
         <div className="overflow-hidden rounded-lg border border-border bg-card">
           <Table>
@@ -163,7 +172,7 @@ export function DataTable<T>({
                   <TableHead
                     key={col.id}
                     className={cn(
-                      "px-3",
+                      viewMode === "compact" ? "px-3 h-8 py-1 text-[11px]" : "px-3",
                       col.align === "right" && "text-right",
                       col.hideBelow && HIDE_CLASS[col.hideBelow],
                       col.className,
@@ -245,7 +254,7 @@ export function DataTable<T>({
                         <TableCell
                           key={col.id}
                           className={cn(
-                            "px-3 py-2.5",
+                            viewMode === "compact" ? "px-3 py-1.5 text-xs" : "px-3 py-2.5",
                             col.align === "right" && "text-right",
                             col.hideBelow && HIDE_CLASS[col.hideBelow],
                             col.className,

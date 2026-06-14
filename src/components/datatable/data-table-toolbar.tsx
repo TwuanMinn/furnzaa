@@ -16,6 +16,8 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { DataTableFilters } from "./data-table-filters";
 import { ImportDialog } from "./import-dialog";
+import { downloadFromFetch } from "@/lib/export/csv";
+import { toDateKey } from "@/lib/format";
 import type { FilterDef } from "@/lib/datatable/types";
 
 interface DataTableToolbarProps {
@@ -35,6 +37,7 @@ interface DataTableToolbarProps {
   onImported?: () => void;
   /** Module-specific primary actions (e.g. "New user"). */
   children?: ReactNode;
+  viewToggle?: ReactNode;
 }
 
 /**
@@ -55,6 +58,7 @@ export function DataTableToolbar({
   exportParams,
   onImported,
   children,
+  viewToggle,
 }: DataTableToolbarProps) {
   const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
   const [importOpen, setImportOpen] = useState(false);
@@ -65,18 +69,10 @@ export function DataTableToolbar({
     try {
       const params = new URLSearchParams(exportParams);
       params.set("format", format);
-      const res = await fetch(`/api/export/${exportDataset}?${params}`);
-      if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(body?.error ?? `Export failed (${res.status})`);
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${exportDataset}-${new Date().toISOString().slice(0, 10)}.${format}`;
-      a.click();
-      URL.revokeObjectURL(url);
+      await downloadFromFetch(
+        `/api/export/${exportDataset}?${params}`,
+        `${exportDataset}-${toDateKey()}.${format}`,
+      );
       toast.success(`Exported ${format.toUpperCase()}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Export failed");
@@ -151,13 +147,14 @@ export function DataTableToolbar({
         </div>
       </div>
 
-      {filterDefs.length > 0 ? (
+      {filterDefs.length > 0 || viewToggle ? (
         <DataTableFilters
           defs={filterDefs}
           values={filterValues}
           onChange={onFilterChange}
           onClear={onClearFilters}
           hasSearch={searchValue.trim() !== ""}
+          viewToggle={viewToggle}
         />
       ) : null}
     </div>

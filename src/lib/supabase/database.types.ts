@@ -4360,6 +4360,79 @@ export type Database = {
           },
         ]
       }
+      staff_tasks: {
+        Row: {
+          assigned_to: string
+          category: string
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          done: boolean
+          due_date: string | null
+          id: string
+          is_active: boolean
+          priority: string
+          title: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          assigned_to: string
+          category?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          done?: boolean
+          due_date?: string | null
+          id?: string
+          is_active?: boolean
+          priority?: string
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          assigned_to?: string
+          category?: string
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          done?: boolean
+          due_date?: string | null
+          id?: string
+          is_active?: boolean
+          priority?: string
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "staff_tasks_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_tasks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "staff_tasks_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suppliers: {
         Row: {
           address: string | null

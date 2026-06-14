@@ -4,12 +4,9 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { asRow, asRows, dbUpdate } from "@/lib/supabase/types";
-import {
-  ForbiddenError,
-  UnauthorizedError,
-  requirePermission,
-} from "@/lib/rbac/guards";
+import { requirePermission } from "@/lib/rbac/guards";
 import { logActivity } from "@/lib/activity/log";
+import { fail, type ActionResult } from "@/lib/actions/result";
 
 /**
  * Production Schedule actions (spec v6, Module 3). The board DERIVES from the
@@ -21,14 +18,7 @@ import { logActivity } from "@/lib/activity/log";
  * permission check here.
  */
 
-export type ScheduleActionResult = { ok: true } | { ok: false; error: string };
-
-function fail(e: unknown): { ok: false; error: string } {
-  if (e instanceof UnauthorizedError) return { ok: false, error: "You are not signed in." };
-  if (e instanceof ForbiddenError)
-    return { ok: false, error: "You don't have permission to do that." };
-  return { ok: false, error: e instanceof Error ? e.message : "Something went wrong" };
-}
+export type ScheduleActionResult = ActionResult;
 
 type QueueRow = {
   order_id: string;

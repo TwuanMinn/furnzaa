@@ -24,6 +24,7 @@
     "analytics:refresh": "tsx --env-file=.env scripts/refresh-analytics.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.104.1",
     "@hookform/resolvers": "^3.9.1",
     "@react-pdf/renderer": "^4.1.6",
     "@supabase/ssr": "^0.5.2",

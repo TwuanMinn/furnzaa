@@ -3,11 +3,8 @@
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { asRow, asRows, dbInsert, dbUpdate } from "@/lib/supabase/types";
-import {
-  ForbiddenError,
-  UnauthorizedError,
-  requirePermission,
-} from "@/lib/rbac/guards";
+import { requirePermission } from "@/lib/rbac/guards";
+import { fail, type ActionResult } from "@/lib/actions/result";
 import { logActivity } from "@/lib/activity/log";
 import { computeCalc, type CalcInputs } from "./calculator";
 
@@ -18,15 +15,7 @@ import { computeCalc, type CalcInputs } from "./calculator";
  * required activity-log entries for saves/deletes.
  */
 
-export type CalcActionResult<T = undefined> =
-  | (T extends undefined ? { ok: true } : { ok: true; data: T })
-  | { ok: false; error: string };
-
-function fail(e: unknown): { ok: false; error: string } {
-  if (e instanceof UnauthorizedError) return { ok: false, error: "You are not signed in." };
-  if (e instanceof ForbiddenError) return { ok: false, error: "You don't have permission to do that." };
-  return { ok: false, error: e instanceof Error ? e.message : "Something went wrong" };
-}
+export type CalcActionResult<T = undefined> = ActionResult<T>;
 
 const money = z.coerce.number().min(0).max(1_000_000_000_000).default(0);
 const calcInputSchema = z.object({

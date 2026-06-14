@@ -23,13 +23,31 @@ export function buildCsv(headerRow: string[], rows: (unknown[] | Record<string, 
   return `﻿${lines.join("\r\n")}\r\n`;
 }
 
-/** Client-side helper: trigger a download of CSV text. */
-export function downloadCsv(filename: string, csv: string): void {
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+/** Client-side helper: trigger a browser download of a Blob. */
+export function downloadBlob(filename: string, blob: Blob): void {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+/** Client-side helper: trigger a download of CSV text. */
+export function downloadCsv(filename: string, csv: string): void {
+  downloadBlob(filename, new Blob([csv], { type: "text/csv;charset=utf-8" }));
+}
+
+/**
+ * Fetch an export endpoint and download the response as `filename`. Throws on a
+ * non-OK response (surfacing the server's `error` message when present) so
+ * callers keep their own try/catch + toast + busy-state handling.
+ */
+export async function downloadFromFetch(url: string, filename: string): Promise<void> {
+  const res = await fetch(url);
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error ?? `Export failed (${res.status})`);
+  }
+  downloadBlob(filename, await res.blob());
 }

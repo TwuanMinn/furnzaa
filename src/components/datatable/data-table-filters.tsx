@@ -1,5 +1,6 @@
 "use client";
 
+import { type ReactNode } from "react";
 import { FilterX, ListFilter, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,7 @@ interface DataTableFiltersProps {
   onChange: (id: string, value: string) => void;
   onClear: () => void;
   hasSearch: boolean;
+  viewToggle?: ReactNode;
 }
 
 const ALL = "__all__";
@@ -48,7 +50,7 @@ function activeLabel(def: FilterDef, values: Record<string, string>): string {
  * inactive filters take no toolbar space. Values feed the server query —
  * filtering always happens in the database, never client-side.
  */
-export function DataTableFilters({ defs, values, onChange, onClear, hasSearch }: DataTableFiltersProps) {
+export function DataTableFilters({ defs, values, onChange, onClear, hasSearch, viewToggle }: DataTableFiltersProps) {
   const activeDefs = defs.filter((def) => isActive(def, values));
   const activeCount = activeDefs.length + (hasSearch ? 1 : 0);
 
@@ -147,6 +149,16 @@ export function DataTableFilters({ defs, values, onChange, onClear, hasSearch }:
                 }
               }
             })}
+            {viewToggle && (
+              <div className="grid gap-1.5 border-t border-border pt-3 mt-1">
+                <Label className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                  View Mode
+                </Label>
+                <div className="flex justify-start">
+                  {viewToggle}
+                </div>
+              </div>
+            )}
           </div>
         </PopoverContent>
       </Popover>

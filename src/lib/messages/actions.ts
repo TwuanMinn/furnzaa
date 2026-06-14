@@ -4,9 +4,10 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { asRow, asRows, dbInsert, dbUpdate } from "@/lib/supabase/types";
-import { requirePermission, ForbiddenError, UnauthorizedError, type SessionUser } from "@/lib/rbac/guards";
+import { requirePermission, type SessionUser } from "@/lib/rbac/guards";
 import { logActivity } from "@/lib/activity/log";
 import { notifyNewGroupMessage } from "@/lib/notifications/service";
+import { fail, type ActionResult } from "@/lib/actions/result";
 
 /**
  * Messages (Module 4) server actions. Sends/edits run through the USER-scoped
@@ -16,15 +17,7 @@ import { notifyNewGroupMessage } from "@/lib/notifications/service";
  * design). Deletes and group changes are activity-logged per the spec.
  */
 
-export type MsgResult<T = undefined> =
-  | (T extends undefined ? { ok: true } : { ok: true; data: T })
-  | { ok: false; error: string };
-
-function fail(e: unknown): { ok: false; error: string } {
-  if (e instanceof UnauthorizedError) return { ok: false, error: "You are not signed in." };
-  if (e instanceof ForbiddenError) return { ok: false, error: "You don't have permission to do that." };
-  return { ok: false, error: e instanceof Error ? e.message : "Something went wrong" };
-}
+export type MsgResult<T = undefined> = ActionResult<T>;
 
 async function isMember(groupId: string, userId: string): Promise<boolean> {
   const admin = createAdminClient();

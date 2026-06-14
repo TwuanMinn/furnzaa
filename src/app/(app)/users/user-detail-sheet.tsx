@@ -32,6 +32,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { ActivityHeatmap } from "@/components/activity-heatmap";
 import { UserPerformancePanel } from "./user-performance";
+import { UserTasksPanel } from "./user-tasks";
 import { Can, useSession } from "@/lib/rbac/context";
 import { formatDate, formatDateTime, initials } from "@/lib/format";
 import {
@@ -148,10 +149,16 @@ export function UserDetailSheet({ user, roles, onOpenChange, onChanged }: UserDe
                     <TabsTrigger value="overview" className="flex-1">
                       Overview
                     </TabsTrigger>
+                    <TabsTrigger value="tasks" className="flex-1">
+                      Tasks
+                    </TabsTrigger>
                     <TabsTrigger value="performance" className="flex-1">
                       Performance
                     </TabsTrigger>
                   </TabsList>
+                  <TabsContent value="tasks" className="pt-3">
+                    <UserTasksPanel key={user.id} userId={user.id} />
+                  </TabsContent>
                   <TabsContent value="performance" className="pt-3">
                     <UserPerformancePanel userId={user.id} />
                   </TabsContent>

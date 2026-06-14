@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, Factory, ListTree, Loader2, Plus, Trash2 } from "lucide-react";
+import { CheckCircle2, Factory, ListTree, Loader2, Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import { DataTable, type DataTableColumn } from "@/components/datatable/data-table";
@@ -39,6 +39,7 @@ import { formatDateTime, formatMoney } from "@/lib/format";
 import type { FilterDef } from "@/lib/datatable/types";
 import type { BomLineRow, ProductionOrderListRow } from "@/lib/datasets/production";
 import { ProductLinePicker, type ProductHit } from "@/app/(app)/orders/order-form-parts";
+import { LineItemRow } from "./line-item-row";
 
 const PRODUCTION_BADGE: Record<string, string> = {
   draft: "bg-slate-100 text-slate-700 dark:bg-slate-400/10 dark:text-slate-300",
@@ -454,26 +455,20 @@ function BomDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open:
                 </p>
               ) : (
                 lines.map((line) => (
-                  <div key={line.key} className="grid grid-cols-[1fr_32px_88px_32px] items-center gap-2">
-                    <div className="truncate rounded-md border border-input bg-muted/30 px-2.5 py-2 text-sm">
-                      {line.product ? (
-                        <>
-                          <span className="font-medium">{line.product.name}</span>{" "}
-                          <span className="text-xs text-muted-foreground">
-                            {line.product.current_stock} in stock
-                          </span>
-                        </>
-                      ) : (
-                        <span className="text-muted-foreground">Pick component →</span>
-                      )}
-                    </div>
-                    <ProductLinePicker
-                      linked={false}
-                      onPick={(p) =>
-                        setLines((prev) => prev.map((l) => (l.key === line.key ? { ...l, product: p } : l)))
-                      }
-                      onUnlink={() => undefined}
-                    />
+                  <LineItemRow
+                    key={line.key}
+                    product={line.product}
+                    secondary={(p) => (
+                      <span className="text-xs text-muted-foreground">{p.current_stock} in stock</span>
+                    )}
+                    emptyLabel="Pick component →"
+                    onPick={(p) =>
+                      setLines((prev) => prev.map((l) => (l.key === line.key ? { ...l, product: p } : l)))
+                    }
+                    onRemove={() => setLines((prev) => prev.filter((l) => l.key !== line.key))}
+                    removeLabel="Remove component"
+                    className="grid-cols-[1fr_32px_88px_32px]"
+                  >
                     <Input
                       type="number"
                       min={0}
@@ -486,17 +481,7 @@ function BomDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open:
                         )
                       }
                     />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      aria-label="Remove component"
-                      onClick={() => setLines((prev) => prev.filter((l) => l.key !== line.key))}
-                      className="text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 />
-                    </Button>
-                  </div>
+                  </LineItemRow>
                 ))
               )}
             </div>

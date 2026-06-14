@@ -4,11 +4,10 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { asRow, asRows, dbInsert, dbUpdate, rpcParams } from "@/lib/supabase/types";
-import {
-  ForbiddenError,
-  UnauthorizedError,
-  requirePermission,
-} from "@/lib/rbac/guards";
+import { nextDocumentNumber } from "@/lib/supabase/document-number";
+import { requirePermission } from "@/lib/rbac/guards";
+import { fail, type ActionResult } from "@/lib/actions/result";
+export type { ActionResult };
 import { logActivity } from "@/lib/activity/log";
 import { notifyLowStock } from "@/lib/notifications/service";
 import { getOrgSettings } from "@/lib/settings/config";
@@ -27,16 +26,6 @@ import {
   type PurchaseOrderInput,
   type SupplierInput,
 } from "./schemas";
-
-export type ActionResult<T = undefined> =
-  | (T extends undefined ? { ok: true } : { ok: true; data: T })
-  | { ok: false; error: string };
-
-function fail(e: unknown): { ok: false; error: string } {
-  if (e instanceof UnauthorizedError) return { ok: false, error: "You are not signed in." };
-  if (e instanceof ForbiddenError) return { ok: false, error: "You don't have permission to do that." };
-  return { ok: false, error: e instanceof Error ? e.message : "Something went wrong" };
-}
 
 /** After a stock-out, alert admins once when stock crosses to/below minimum. */
 async function maybeLowStockAlert(productId: string, previousStock: number) {
@@ -77,12 +66,7 @@ export async function createProductAction(
     const supabase = await createClient();
     // SKU prefix is configured in Settings → Inventory (falls back to "SKU").
     const skuPrefix = (await getOrgSettings()).skuPrefix.trim() || "SKU";
-    const { data: skuData, error: skuError } = await supabase.rpc(
-      "next_document_number",
-      rpcParams("next_document_number", { p_prefix: skuPrefix }),
-    );
-    if (skuError) return { ok: false, error: skuError.message };
-    const sku = skuData as string;
+    const sku = await nextDocumentNumber(supabase, skuPrefix);
 
     const { data, error } = await supabase
       .from("products")
@@ -400,12 +384,7 @@ export async function createPurchaseOrderAction(
     const v = parsed.data;
 
     const supabase = await createClient();
-    const { data: poNumData, error: poNumError } = await supabase.rpc(
-      "next_document_number",
-      rpcParams("next_document_number", { p_prefix: "PO" }),
-    );
-    if (poNumError) return { ok: false, error: poNumError.message };
-    const poNumber = poNumData as string;
+    const poNumber = await nextDocumentNumber(supabase, "PO");
 
     const total = v.items.reduce((s, it) => s + it.quantity * it.unitCostCents, 0);
     const { data, error } = await supabase
@@ -544,12 +523,7 @@ export async function createProductionOrderAction(
       return { ok: false, error: "This product has no bill of materials yet — define its components first." };
     }
 
-    const { data: codeData, error: codeError } = await supabase.rpc(
-      "next_document_number",
-      rpcParams("next_document_number", { p_prefix: "PRD" }),
-    );
-    if (codeError) return { ok: false, error: codeError.message };
-    const code = codeData as string;
+    const code = await nextDocumentNumber(supabase, "PRD");
 
     const { data, error } = await supabase
       .from("production_orders")

@@ -4,11 +4,12 @@ import { createHash, randomBytes, scryptSync, timingSafeEqual } from "node:crypt
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { asRow, asRows, dbInsert, dbUpdate, rpcParams } from "@/lib/supabase/types";
-import { requirePermission, ForbiddenError, UnauthorizedError } from "@/lib/rbac/guards";
+import { asRow, asRows, dbInsert, dbUpdate, rpcParams, type TablesInsert } from "@/lib/supabase/types";
+import { requirePermission } from "@/lib/rbac/guards";
 import { logActivity } from "@/lib/activity/log";
 import { sendNotification } from "@/lib/notifications/service";
 import { getOrgSettings } from "@/lib/settings/config";
+import { fail, type ActionResult } from "@/lib/actions/result";
 
 /**
  * Messages v4 server actions (Module 8 advanced): reactions, pins (group +
@@ -17,14 +18,35 @@ import { getOrgSettings } from "@/lib/settings/config";
  * 0016 is the second enforcement layer behind every guard here.
  */
 
-export type MsgResult<T = undefined> =
-  | (T extends undefined ? { ok: true } : { ok: true; data: T })
-  | { ok: false; error: string };
+export type MsgResult<T = undefined> = ActionResult<T>;
 
-function fail(e: unknown): { ok: false; error: string } {
-  if (e instanceof UnauthorizedError) return { ok: false, error: "You are not signed in." };
-  if (e instanceof ForbiddenError) return { ok: false, error: "You don't have permission to do that." };
-  return { ok: false, error: e instanceof Error ? e.message : "Something went wrong" };
+type ToggleClient = Awaited<ReturnType<typeof createClient>>;
+type ToggleTable = Parameters<typeof dbInsert>[0];
+
+/**
+ * Toggle a presence row (reaction / pin / star): delete it when `existingId` is
+ * set, otherwise insert `payload`. The caller does the typed `.select("id")`
+ * and passes the resolved id (or null) so this stays free of dynamic-column
+ * typing. Returns `{ existed }` so callers can branch their activity logging,
+ * or `{ error }` on a DB failure.
+ */
+async function applyToggle<T extends ToggleTable>(
+  supabase: ToggleClient,
+  table: T,
+  existingId: string | null,
+  payload: TablesInsert<T>,
+): Promise<{ existed: boolean } | { error: string }> {
+  if (existingId) {
+    // The generic table name collapses postgrest's column typing under TS6; the
+    // id comes from the caller's own typed select, so filter via `as never`
+    // (the same escape hatch as dbInsert/rpcParams).
+    const { error } = await supabase.from(table).delete().eq("id" as never, existingId as never);
+    if (error) return { error: error.message };
+    return { existed: true };
+  }
+  const { error } = await supabase.from(table).insert(dbInsert(table, payload));
+  if (error) return { error: error.message };
+  return { existed: false };
 }
 
 // ── Reactions ────────────────────────────────────────────────────────────────
@@ -43,18 +65,12 @@ export async function toggleReactionAction(messageId: string, emoji: string): Pr
       .eq("emoji", emoji)
       .maybeSingle();
 
-    if (existing) {
-      const { error } = await supabase
-        .from("message_reactions")
-        .delete()
-        .eq("id", (existing as { id: string }).id);
-      if (error) return { ok: false, error: error.message };
-    } else {
-      const { error } = await supabase
-        .from("message_reactions")
-        .insert(dbInsert("message_reactions", { message_id: messageId, user_id: actor.id, emoji }));
-      if (error) return { ok: false, error: error.message };
-    }
+    const result = await applyToggle(supabase, "message_reactions", asRow<{ id: string }>(existing)?.id ?? null, {
+      message_id: messageId,
+      user_id: actor.id,
+      emoji,
+    });
+    if ("error" in result) return { ok: false, error: result.error };
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -82,38 +98,21 @@ export async function togglePinMessageAction(messageId: string): Promise<MsgResu
       .eq("message_id", messageId)
       .maybeSingle();
 
-    if (existing) {
-      const { error } = await supabase
-        .from("message_pins")
-        .delete()
-        .eq("id", (existing as { id: string }).id);
-      if (error) return { ok: false, error: error.message };
-      void logActivity({
-        actor,
-        action: "message.unpin",
-        module: "messages",
-        targetType: "message",
-        targetId: messageId,
-        summary: `Unpinned a message: “${message.body.slice(0, 60)}”`,
-      });
-    } else {
-      const { error } = await supabase.from("message_pins").insert(
-        dbInsert("message_pins", {
-          group_id: message.group_id,
-          message_id: messageId,
-          pinned_by: actor.id,
-        }),
-      );
-      if (error) return { ok: false, error: error.message };
-      void logActivity({
-        actor,
-        action: "message.pin",
-        module: "messages",
-        targetType: "message",
-        targetId: messageId,
-        summary: `Pinned a message: “${message.body.slice(0, 60)}”`,
-      });
-    }
+    const result = await applyToggle(supabase, "message_pins", asRow<{ id: string }>(existing)?.id ?? null, {
+      group_id: message.group_id,
+      message_id: messageId,
+      pinned_by: actor.id,
+    });
+    if ("error" in result) return { ok: false, error: result.error };
+
+    void logActivity({
+      actor,
+      action: result.existed ? "message.unpin" : "message.pin",
+      module: "messages",
+      targetType: "message",
+      targetId: messageId,
+      summary: `${result.existed ? "Unpinned" : "Pinned"} a message: “${message.body.slice(0, 60)}”`,
+    });
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -131,18 +130,11 @@ export async function togglePinnedConversationAction(groupId: string): Promise<M
       .eq("user_id", actor.id)
       .eq("group_id", groupId)
       .maybeSingle();
-    if (existing) {
-      const { error } = await supabase
-        .from("pinned_conversations")
-        .delete()
-        .eq("id", (existing as { id: string }).id);
-      if (error) return { ok: false, error: error.message };
-    } else {
-      const { error } = await supabase
-        .from("pinned_conversations")
-        .insert(dbInsert("pinned_conversations", { user_id: actor.id, group_id: groupId }));
-      if (error) return { ok: false, error: error.message };
-    }
+    const result = await applyToggle(supabase, "pinned_conversations", asRow<{ id: string }>(existing)?.id ?? null, {
+      user_id: actor.id,
+      group_id: groupId,
+    });
+    if ("error" in result) return { ok: false, error: result.error };
     return { ok: true };
   } catch (e) {
     return fail(e);
@@ -160,18 +152,11 @@ export async function toggleStarAction(messageId: string): Promise<MsgResult> {
       .eq("user_id", actor.id)
       .eq("message_id", messageId)
       .maybeSingle();
-    if (existing) {
-      const { error } = await supabase
-        .from("message_stars")
-        .delete()
-        .eq("id", (existing as { id: string }).id);
-      if (error) return { ok: false, error: error.message };
-    } else {
-      const { error } = await supabase
-        .from("message_stars")
-        .insert(dbInsert("message_stars", { user_id: actor.id, message_id: messageId }));
-      if (error) return { ok: false, error: error.message };
-    }
+    const result = await applyToggle(supabase, "message_stars", asRow<{ id: string }>(existing)?.id ?? null, {
+      user_id: actor.id,
+      message_id: messageId,
+    });
+    if ("error" in result) return { ok: false, error: result.error };
     return { ok: true };
   } catch (e) {
     return fail(e);

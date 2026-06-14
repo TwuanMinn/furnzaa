@@ -32,6 +32,7 @@ export interface UserPerformance {
     efficiencyPct: number | null;
   };
   feedback: { resolved: number; medianResolutionHours: number | null };
+  tasks: { total: number; completed: number };
   activity30d: { logins: number; actions: number; activeDays: number };
 }
 
@@ -58,7 +59,7 @@ export const GET = withAuth(async (_req, ctx) => {
   const seriesStartIso = `${monthKey(seriesStart)}-01`;
 
   try {
-    const [settings, ordersRes, printsRes, feedbackRes, activityRes] = await Promise.all([
+    const [settings, ordersRes, printsRes, feedbackRes, tasksRes, activityRes] = await Promise.all([
       getOrgSettings(),
       admin
         .from("mv_orders_daily")
@@ -77,13 +78,19 @@ export const GET = withAuth(async (_req, ctx) => {
         .eq("resolved_by", id)
         .maybeSingle(),
       admin
+        .from("staff_tasks")
+        .select("done")
+        .eq("assigned_to", id)
+        .eq("is_active", true)
+        .limit(2_000),
+      admin
         .from("user_activity_daily")
         .select("day, logins, actions")
         .eq("user_id", id)
         .gte("day", new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10))
         .limit(40),
     ]);
-    for (const res of [ordersRes, printsRes, activityRes]) {
+    for (const res of [ordersRes, printsRes, tasksRes, activityRes]) {
       if (res.error) return jsonError(res.error.message, 500);
     }
 
@@ -158,6 +165,10 @@ export const GET = withAuth(async (_req, ctx) => {
       feedbackRes.data,
     );
 
+    const taskRows = asRows<{ done: boolean }>(tasksRes.data);
+    const tasksTotal = taskRows.length;
+    const tasksCompleted = taskRows.filter((t) => t.done).length;
+
     let logins = 0;
     let actions = 0;
     let activeDays = 0;
@@ -181,6 +192,7 @@ export const GET = withAuth(async (_req, ctx) => {
         medianResolutionHours:
           fb?.median_resolution_hours != null ? Number(fb.median_resolution_hours) : null,
       },
+      tasks: { total: tasksTotal, completed: tasksCompleted },
       activity30d: { logins, actions, activeDays },
     };
     return jsonOk(payload);

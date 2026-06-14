@@ -38,10 +38,11 @@ export type OrderListRow = {
   customers: { id: string; name: string } | null;
   printers: { brand: string; model: string; badge_color: string } | null;
   assigned: { id: string; full_name: string } | null;
+  order_items: { name: string; quantity: number; sort_order: number }[];
 };
 
 const LIST_COLUMNS =
-  "id, order_code, buying_date, priority, status, payment_status, total_cents, currency, delivery_date, printer_id, print_state, print_started_at, material_type, actual_print_minutes, estimated_print_minutes, created_at, customers(id, name), printers(brand, model, badge_color), assigned:users!orders_assigned_staff_id_fkey(id, full_name)";
+  "id, order_code, buying_date, priority, status, payment_status, total_cents, currency, delivery_date, printer_id, print_state, print_started_at, material_type, actual_print_minutes, estimated_print_minutes, created_at, customers(id, name), printers(brand, model, badge_color), assigned:users!orders_assigned_staff_id_fkey(id, full_name), order_items(name, quantity, sort_order)";
 
 /**
  * Allow-listed sortable columns (keyset-safe). Print minutes are written as 0

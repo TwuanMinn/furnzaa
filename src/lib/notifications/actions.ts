@@ -3,17 +3,12 @@
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { dbUpdate } from "@/lib/supabase/types";
-import { requirePermission, requireUser, ForbiddenError, UnauthorizedError } from "@/lib/rbac/guards";
+import { requirePermission, requireUser } from "@/lib/rbac/guards";
 import { logActivity } from "@/lib/activity/log";
+import { fail, type ActionResult } from "@/lib/actions/result";
 import { sendNotification } from "./service";
 
-export type NotifActionResult = { ok: true } | { ok: false; error: string };
-
-function fail(e: unknown): { ok: false; error: string } {
-  if (e instanceof UnauthorizedError) return { ok: false, error: "You are not signed in." };
-  if (e instanceof ForbiddenError) return { ok: false, error: "You don't have permission to do that." };
-  return { ok: false, error: e instanceof Error ? e.message : "Something went wrong" };
-}
+export type NotifActionResult = ActionResult;
 
 const composeSchema = z.object({
   title: z.string().trim().min(2, "Title is required").max(300),

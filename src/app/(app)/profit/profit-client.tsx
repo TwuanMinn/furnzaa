@@ -22,18 +22,13 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/states";
 import { badgeClass } from "@/lib/badges";
-import { formatDate, formatMinutes, formatMoney } from "@/lib/format";
+import { formatDate, formatMinutes, formatMoney, toDateKey } from "@/lib/format";
+import { downloadFromFetch } from "@/lib/export/csv";
 import type { ProfitData } from "@/lib/datasets/profit";
 
 const REVENUE_COLOR = "#6366f1"; // indigo-500
 const COST_COLOR = "#f59e0b"; // amber-500
 const PROFIT_COLOR = "#10b981"; // emerald-500
-
-function localDate(daysAgo = 0): string {
-  const d = new Date();
-  d.setDate(d.getDate() - daysAgo);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
 
 const PRESETS = [
   { label: "30d", days: 30 },
@@ -44,8 +39,8 @@ const PRESETS = [
 
 export function ProfitClient({ currency }: { currency: string }) {
   const reduce = useReducedMotion();
-  const [from, setFrom] = useState<string>(localDate(90));
-  const [to, setTo] = useState<string>(localDate(0));
+  const [from, setFrom] = useState<string>(toDateKey(90));
+  const [to, setTo] = useState<string>(toDateKey(0));
   const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
 
   const query = useQuery({
@@ -92,18 +87,7 @@ export function ProfitClient({ currency }: { currency: string }) {
   async function exportFile(format: "csv" | "pdf") {
     setExporting(format);
     try {
-      const res = await fetch(`/api/export/profit?format=${format}`);
-      if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(body?.error ?? `Export failed (${res.status})`);
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `profit-${localDate(0)}.${format}`;
-      a.click();
-      URL.revokeObjectURL(url);
+      await downloadFromFetch(`/api/export/profit?format=${format}`, `profit-${toDateKey()}.${format}`);
       toast.success(`Exported ${format.toUpperCase()}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Export failed");
@@ -150,8 +134,8 @@ export function ProfitClient({ currency }: { currency: string }) {
                 variant="outline"
                 size="sm"
                 onClick={() => {
-                  setFrom(p.days ? localDate(p.days) : "");
-                  setTo(localDate(0));
+                  setFrom(p.days ? toDateKey(p.days) : "");
+                  setTo(toDateKey(0));
                 }}
               >
                 {p.label}

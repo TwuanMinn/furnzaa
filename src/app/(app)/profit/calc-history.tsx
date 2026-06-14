@@ -34,7 +34,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { formatAmount } from "@/lib/format";
+import { formatAmount, formatMinutes } from "@/lib/format";
 import {
   statusAgainstTarget,
   summarizeHistory,
@@ -461,9 +461,9 @@ function CompareTable({
       b: `${Number(b.waste_percent)}%`,
     },
     {
-      label: "Print time (h)",
-      a: `${Number(a.print_time_hours)}h`,
-      b: `${Number(b.print_time_hours)}h`,
+      label: "Print time",
+      a: formatMinutes(Math.round(Number(a.print_time_hours) * 60)),
+      b: formatMinutes(Math.round(Number(b.print_time_hours) * 60)),
     },
     {
       label: "Total cost",
@@ -640,7 +640,7 @@ function HistoryCardContent({
       <p className="mt-2 text-xs text-muted-foreground">
         {Number(r.filament_with_waste_g).toFixed(0)}g{" "}
         {materialLabel(r.material)} ·{" "}
-        {Number(r.print_time_hours)}h print ·{" "}
+        {formatMinutes(Math.round(Number(r.print_time_hours) * 60))} print ·{" "}
         {Number(r.roi_percent).toFixed(1)}% ROI
       </p>
     </>

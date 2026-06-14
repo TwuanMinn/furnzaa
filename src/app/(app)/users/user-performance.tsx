@@ -101,6 +101,15 @@ export function UserPerformancePanel({ userId }: { userId: string }) {
           : "no resolutions yet",
     },
     {
+      label: "Tasks done",
+      value:
+        d.tasks.total > 0 ? `${d.tasks.completed}/${d.tasks.total}` : String(d.tasks.completed),
+      sub:
+        d.tasks.total > 0
+          ? `${Math.round((d.tasks.completed / d.tasks.total) * 100)}% complete`
+          : "no tasks assigned",
+    },
+    {
       label: "Activity (30d)",
       value: String(d.activity30d.actions),
       sub: `${d.activity30d.activeDays} active days · ${d.activity30d.logins} logins`,

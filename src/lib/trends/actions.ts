@@ -3,12 +3,10 @@
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { asRow, dbInsert, dbUpdate, rpcParams } from "@/lib/supabase/types";
-import {
-  ForbiddenError,
-  UnauthorizedError,
-  requirePermission,
-} from "@/lib/rbac/guards";
+import { asRow, dbInsert, dbUpdate } from "@/lib/supabase/types";
+import { nextDocumentNumber } from "@/lib/supabase/document-number";
+import { requirePermission } from "@/lib/rbac/guards";
+import { fail, type ActionResult } from "@/lib/actions/result";
 import { logActivity } from "@/lib/activity/log";
 import { getOrgSettings } from "@/lib/settings/config";
 import { trendSchema, type TrendInput } from "./schemas";
@@ -19,16 +17,7 @@ import { trendSchema, type TrendInput } from "./schemas";
  * trends.manage; votes are own-row only with the incremental count trigger.
  */
 
-export type TrendResult<T = undefined> =
-  | (T extends undefined ? { ok: true } : { ok: true; data: T })
-  | { ok: false; error: string };
-
-function fail(e: unknown): { ok: false; error: string } {
-  if (e instanceof UnauthorizedError) return { ok: false, error: "You are not signed in." };
-  if (e instanceof ForbiddenError)
-    return { ok: false, error: "You don't have permission to do that." };
-  return { ok: false, error: e instanceof Error ? e.message : "Something went wrong" };
-}
+export type TrendResult<T = undefined> = ActionResult<T>;
 
 function toRowPatch(v: TrendInput) {
   return {
@@ -233,12 +222,7 @@ export async function promoteTrendAction(
     if (trend.promoted_product_id)
       return { ok: true, data: { productId: trend.promoted_product_id, sku: null, already: true } };
 
-    const { data: skuData, error: skuError } = await admin.rpc(
-      "next_document_number",
-      rpcParams("next_document_number", { p_prefix: "SKU" }),
-    );
-    if (skuError) return { ok: false, error: skuError.message };
-    const sku = skuData as string;
+    const sku = await nextDocumentNumber(admin, "SKU");
 
     const { data: productRaw, error: productError } = await admin
       .from("products")

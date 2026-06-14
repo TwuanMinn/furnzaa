@@ -73,6 +73,19 @@ export function formatDateTime(value: string | Date | null | undefined, fmt = "M
   return d ? format(d, fmt) : "—";
 }
 
+/**
+ * Local-calendar date key (YYYY-MM-DD), optionally `daysAgo` days back. Built
+ * from LOCAL date parts — never `toISOString().slice(0,10)`, which is UTC and
+ * shifts the day backward in positive-UTC zones (the recurring Furnza bug).
+ */
+export function toDateKey(daysAgo = 0): string {
+  const d = new Date();
+  if (daysAgo) d.setDate(d.getDate() - daysAgo);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
+    d.getDate(),
+  ).padStart(2, "0")}`;
+}
+
 /** Two-letter initials from a full name, for avatar fallbacks. */
 export function initials(name: string | null | undefined): string {
   if (!name) return "?";

@@ -1,5 +1,8 @@
 "use client";
 
+import { Plus, X } from "lucide-react";
+
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -9,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { CalcMaterial, FormState } from "./cost-calculator";
+import type { CalcMaterial, FormState, OtherCostItem } from "./cost-calculator";
 
 // ─── Shared micro-components ─────────────────────────────────────────────────
 
@@ -94,6 +97,93 @@ export function NumField({
   );
 }
 
+/**
+ * Repeatable "other costs" rows — each a free label + amount. The calculator
+ * sums the amounts into the cost total, so you can break out packaging,
+ * shipping, marketplace fees, etc. instead of one lumped figure.
+ */
+function OtherCostsFields({
+  items,
+  onAdd,
+  onRemove,
+  onChange,
+}: {
+  items: OtherCostItem[];
+  onAdd: () => void;
+  onRemove: (id: string) => void;
+  onChange: (id: string, field: "label" | "amount", value: string) => void;
+}) {
+  const total = items.reduce((sum, it) => {
+    const n = Number(it.amount);
+    return sum + (Number.isFinite(n) && n > 0 ? n : 0);
+  }, 0);
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <Label>Other costs (₫)</Label>
+        {items.length > 1 && total > 0 ? (
+          <span className="text-xs tabular-nums text-muted-foreground">
+            Total {total.toLocaleString("en-US")} ₫
+          </span>
+        ) : null}
+      </div>
+
+      {items.length > 0 ? (
+        <div className="space-y-2">
+          {items.map((item) => {
+            const n = Number(item.amount);
+            const amountError = item.amount !== "" && (!Number.isFinite(n) || n < 0);
+            return (
+              <div key={item.id} className="flex items-center gap-2">
+                <Input
+                  aria-label="Cost label"
+                  value={item.label}
+                  onChange={(e) => onChange(item.id, "label", e.target.value)}
+                  placeholder="e.g. Packaging"
+                  maxLength={60}
+                  className="flex-1"
+                />
+                <div className="relative w-32 shrink-0 sm:w-40">
+                  <Input
+                    type="number"
+                    inputMode="decimal"
+                    min={0}
+                    aria-label="Cost amount"
+                    value={item.amount}
+                    onChange={(e) => onChange(item.id, "amount", e.target.value)}
+                    placeholder="0"
+                    className="pr-7"
+                    aria-invalid={amountError ? true : undefined}
+                  />
+                  <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs text-muted-foreground">
+                    ₫
+                  </span>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0 text-muted-foreground hover:text-foreground"
+                  onClick={() => onRemove(item.id)}
+                  aria-label={`Remove ${item.label || "cost"}`}
+                >
+                  <X aria-hidden />
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
+
+      <Button type="button" variant="outline" size="sm" onClick={onAdd}>
+        <Plus aria-hidden /> Add cost
+      </Button>
+      <FieldHelp>Packaging, shipping, fees… add a line for each.</FieldHelp>
+    </div>
+  );
+}
+
 // ─── Main form ───────────────────────────────────────────────────────────────
 
 export function CalcForm({
@@ -101,11 +191,17 @@ export function CalcForm({
   materials,
   onFieldChange,
   onMaterialChange,
+  onAddOtherCost,
+  onRemoveOtherCost,
+  onOtherCostChange,
 }: {
   form: FormState;
   materials: CalcMaterial[];
   onFieldChange: (key: keyof FormState, value: string) => void;
   onMaterialChange: (key: string) => void;
+  onAddOtherCost: () => void;
+  onRemoveOtherCost: (id: string) => void;
+  onOtherCostChange: (id: string, field: "label" | "amount", value: string) => void;
 }) {
   const set = (key: keyof FormState) => (v: string) => onFieldChange(key, v);
 
@@ -219,13 +315,50 @@ export function CalcForm({
       <section className="space-y-3 rounded-xl border border-border bg-card p-4">
         <SectionLabel>Printing cost</SectionLabel>
         <div className="grid gap-3 sm:grid-cols-2">
-          <NumField
-            id="cc-hours"
-            label="Print time (hours)"
-            value={form.printTimeHours}
-            onChange={set("printTimeHours")}
-            placeholder="e.g. 4.5"
-          />
+          <div className="space-y-1.5">
+            <Label>Print time</Label>
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <Input
+                  id="cc-hours"
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  value={form.printTimeHours}
+                  onChange={(e) => set("printTimeHours")(e.target.value)}
+                  placeholder="0"
+                  className="pr-7"
+                  aria-label="Print time hours"
+                  aria-invalid={validate("printTimeHours", form.printTimeHours) ? true : undefined}
+                />
+                <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs text-muted-foreground">
+                  h
+                </span>
+              </div>
+              <div className="relative flex-1">
+                <Input
+                  id="cc-minutes"
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  value={form.printTimeMinutes}
+                  onChange={(e) => set("printTimeMinutes")(e.target.value)}
+                  placeholder="0"
+                  className="pr-7"
+                  aria-label="Print time minutes"
+                  aria-invalid={validate("printTimeMinutes", form.printTimeMinutes) ? true : undefined}
+                />
+                <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-xs text-muted-foreground">
+                  m
+                </span>
+              </div>
+            </div>
+            {validate("printTimeHours", form.printTimeHours) || validate("printTimeMinutes", form.printTimeMinutes) ? (
+              <p className="text-xs text-destructive">
+                {validate("printTimeHours", form.printTimeHours) || validate("printTimeMinutes", form.printTimeMinutes)}
+              </p>
+            ) : null}
+          </div>
           <NumField
             id="cc-elec-rate"
             label="Electricity rate (₫/kWh)"
@@ -263,14 +396,6 @@ export function CalcForm({
             error={validate("sellingPrice", form.sellingPrice)}
           />
           <NumField
-            id="cc-other"
-            label="Other costs (₫)"
-            value={form.otherCosts}
-            onChange={set("otherCosts")}
-            help="Packaging, shipping…"
-            error={validate("otherCosts", form.otherCosts)}
-          />
-          <NumField
             id="cc-target"
             label="Target margin (%)"
             value={form.targetMarginPercent}
@@ -290,6 +415,12 @@ export function CalcForm({
             error={validate("quantity", form.quantity)}
           />
         </div>
+        <OtherCostsFields
+          items={form.otherCostItems}
+          onAdd={onAddOtherCost}
+          onRemove={onRemoveOtherCost}
+          onChange={onOtherCostChange}
+        />
       </section>
     </div>
   );

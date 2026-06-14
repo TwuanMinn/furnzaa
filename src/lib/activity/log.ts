@@ -9,6 +9,7 @@ import type { SessionUser } from "@/lib/rbac/guards";
 export type ActivityModule =
   | "auth"
   | "users"
+  | "tasks"
   | "customers"
   | "orders"
   | "schedule"

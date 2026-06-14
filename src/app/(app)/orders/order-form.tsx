@@ -30,6 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { OptionalSelect } from "@/components/ui/optional-select";
 import {
   Command,
   CommandEmpty,
@@ -452,22 +453,14 @@ export function OrderForm({
                   control={control}
                   name="assignedStaffId"
                   render={({ field }) => (
-                    <Select
-                      value={field.value || "__none__"}
-                      onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}
-                    >
-                      <SelectTrigger id="of-assigned" className="w-full">
-                        <SelectValue placeholder="Unassigned" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">Unassigned</SelectItem>
-                        {staff.map((s) => (
-                          <SelectItem key={s.id} value={s.id}>
-                            {s.full_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <OptionalSelect
+                      id="of-assigned"
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      placeholder="Unassigned"
+                      emptyLabel="Unassigned"
+                      options={staff.map((s) => ({ value: s.id, label: s.full_name }))}
+                    />
                   )}
                 />
               </div>
@@ -506,22 +499,14 @@ export function OrderForm({
                   control={control}
                   name="materialType"
                   render={({ field }) => (
-                    <Select
-                      value={field.value || "__none__"}
-                      onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}
-                    >
-                      <SelectTrigger id="of-material" className="w-full">
-                        <SelectValue placeholder="Select material…" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="__none__">Not set</SelectItem>
-                        {materials.map((m) => (
-                          <SelectItem key={m.key} value={m.key}>
-                            {m.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <OptionalSelect
+                      id="of-material"
+                      value={field.value ?? ""}
+                      onChange={field.onChange}
+                      placeholder="Select material…"
+                      emptyLabel="Not set"
+                      options={materials.map((m) => ({ value: m.key, label: m.label }))}
+                    />
                   )}
                 />
               </div>
@@ -716,22 +701,14 @@ export function OrderForm({
                 control={control}
                 name="paymentMethod"
                 render={({ field }) => (
-                  <Select
-                    value={field.value || "__none__"}
-                    onValueChange={(v) => field.onChange(v === "__none__" ? "" : v)}
-                  >
-                    <SelectTrigger id="of-pay-method" className="w-full">
-                      <SelectValue placeholder="Select…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none__">Not set</SelectItem>
-                      {PAYMENT_METHODS.map((m) => (
-                        <SelectItem key={m} value={m}>
-                          {m}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <OptionalSelect
+                    id="of-pay-method"
+                    value={field.value ?? ""}
+                    onChange={field.onChange}
+                    placeholder="Select…"
+                    emptyLabel="Not set"
+                    options={PAYMENT_METHODS.map((m) => ({ value: m, label: m }))}
+                  />
                 )}
               />
             </div>

@@ -3,7 +3,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { asRow, asRows, dbInsert, dbUpdate, rpcParams, type Tables } from "@/lib/supabase/types";
-import { requirePermission, ForbiddenError, UnauthorizedError, type SessionUser } from "@/lib/rbac/guards";
+import { requirePermission, type SessionUser } from "@/lib/rbac/guards";
+import { fail, type ActionResult } from "@/lib/actions/result";
 import { logActivity } from "@/lib/activity/log";
 import { notifyLowStock, notifyOrderAssigned, notifyOrderDelivered } from "@/lib/notifications/service";
 import { handleOrderCrm } from "@/lib/crm/hooks";
@@ -25,13 +26,7 @@ import {
  */
 
 export type OrderActionResult = { ok: true; orderId: string; orderCode: string } | { ok: false; error: string };
-export type SimpleResult = { ok: true } | { ok: false; error: string };
-
-function fail(e: unknown): { ok: false; error: string } {
-  if (e instanceof UnauthorizedError) return { ok: false, error: "You are not signed in." };
-  if (e instanceof ForbiddenError) return { ok: false, error: "You don't have permission to do that." };
-  return { ok: false, error: e instanceof Error ? e.message : "Something went wrong" };
-}
+export type SimpleResult = ActionResult;
 
 interface ComputedTotals {
   items: {

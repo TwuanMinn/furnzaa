@@ -16,6 +16,7 @@ import type { ExportDataset } from "@/lib/export/types";
 import { chunk, type ImportDataset } from "@/lib/import/server";
 import type { ImportCommitResult, RowError, ValidatedRow } from "@/lib/import/types";
 import { centsToDecimalString, formatDateTime } from "@/lib/format";
+import { nextDocumentNumber } from "@/lib/supabase/document-number";
 
 export type ProductListRow = {
   id: string;
@@ -189,8 +190,12 @@ async function insertProductRows(rows: ValidatedRow[], user: SessionUser): Promi
     const slice = rows.slice(i, i + CONCURRENCY);
     const skus = await Promise.all(
       slice.map(async (row) => {
-        const { data, error } = await admin.rpc("next_document_number", { p_prefix: "SKU" });
-        return error ? { row, sku: null as string | null } : { row, sku: data as string };
+        // Per-row: a single SKU failure shouldn't abort the whole import batch.
+        try {
+          return { row, sku: await nextDocumentNumber(admin, "SKU") };
+        } catch {
+          return { row, sku: null as string | null };
+        }
       }),
     );
     for (const s of skus) {

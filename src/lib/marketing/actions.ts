@@ -4,21 +4,14 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { asRow, dbInsert, dbUpdate } from "@/lib/supabase/types";
-import { requirePermission, ForbiddenError, UnauthorizedError } from "@/lib/rbac/guards";
+import { requirePermission } from "@/lib/rbac/guards";
 import { logActivity } from "@/lib/activity/log";
 import { processCampaignBatch } from "./pipeline";
+import { fail, type ActionResult } from "@/lib/actions/result";
 
 /** Marketing server actions: campaign lifecycle + automation rule management. */
 
-export type MarketingResult<T = undefined> =
-  | (T extends undefined ? { ok: true } : { ok: true; data: T })
-  | { ok: false; error: string };
-
-function fail(e: unknown): { ok: false; error: string } {
-  if (e instanceof UnauthorizedError) return { ok: false, error: "You are not signed in." };
-  if (e instanceof ForbiddenError) return { ok: false, error: "You don't have permission to do that." };
-  return { ok: false, error: e instanceof Error ? e.message : "Something went wrong" };
-}
+export type MarketingResult<T = undefined> = ActionResult<T>;
 
 const campaignSchema = z
   .object({

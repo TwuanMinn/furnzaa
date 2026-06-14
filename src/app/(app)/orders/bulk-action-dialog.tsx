@@ -13,21 +13,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { OptionalSelect } from "@/components/ui/optional-select";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { bulkOrderActionsAction } from "@/lib/orders/actions";
 import type { BulkOrderAction } from "@/lib/orders/schemas";
 import type { StaffOption } from "@/app/api/staff/route";
-
-/** Sentinel for the "Unassign" option (Radix Select needs a non-empty value). */
-const UNASSIGN = "__unassign__";
 
 const TITLES: Record<BulkOrderAction, string> = {
   delete: "Delete selected orders?",
@@ -64,11 +55,11 @@ export function OrdersBulkActionDialog({
   onOpenChange: (open: boolean) => void;
   onDone?: () => void;
 }) {
-  const [assignee, setAssignee] = useState<string>(UNASSIGN);
+  const [assignee, setAssignee] = useState<string>(""); // "" = unassign
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (state) setAssignee(staff[0]?.id ?? UNASSIGN);
+    if (state) setAssignee(staff[0]?.id ?? "");
   }, [state, staff]);
 
   const count = state?.ids.length ?? 0;
@@ -80,8 +71,7 @@ export function OrdersBulkActionDialog({
       const result = await bulkOrderActionsAction({
         action: state.action,
         orderIds: state.ids,
-        assignedStaffId:
-          state.action === "assign" ? (assignee === UNASSIGN ? null : assignee) : undefined,
+        assignedStaffId: state.action === "assign" ? assignee || null : undefined,
       });
       if (result.ok) {
         toast.success(
@@ -120,19 +110,13 @@ export function OrdersBulkActionDialog({
             {state.action === "assign" ? (
               <div className="space-y-1.5">
                 <Label htmlFor="bulk-assignee">Assign to</Label>
-                <Select value={assignee} onValueChange={setAssignee}>
-                  <SelectTrigger id="bulk-assignee" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={UNASSIGN}>Unassign</SelectItem>
-                    {staff.map((s) => (
-                      <SelectItem key={s.id} value={s.id}>
-                        {s.full_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <OptionalSelect
+                  id="bulk-assignee"
+                  value={assignee}
+                  onChange={setAssignee}
+                  emptyLabel="Unassign"
+                  options={staff.map((s) => ({ value: s.id, label: s.full_name }))}
+                />
               </div>
             ) : null}
 

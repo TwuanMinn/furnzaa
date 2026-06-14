@@ -17,6 +17,7 @@
 export type PermissionModule =
   | "dashboard"
   | "users"
+  | "tasks"
   | "orders"
   | "schedule"
   | "customers"
@@ -49,6 +50,10 @@ export const PERMISSIONS = [
   { key: "users.delete", module: "users", description: "Permanently delete users" },
   { key: "users.import", module: "users", description: "Import users from CSV" },
   { key: "users.export", module: "users", description: "Export users (CSV/PDF)" },
+
+  { key: "tasks.view", module: "tasks", description: "View staff tasks (own; complete own)" },
+  { key: "tasks.view_all", module: "tasks", description: "View every staff member's tasks" },
+  { key: "tasks.manage", module: "tasks", description: "Assign, edit and delete staff tasks" },
 
   { key: "orders.view", module: "orders", description: "View orders (own/assigned)" },
   { key: "orders.view_all", module: "orders", description: "View all orders company-wide" },
@@ -174,10 +179,12 @@ export type RoleKey = (typeof ROLES)[number]["key"];
  * movements, creating/receiving POs, plus read-only CRM & marketing data.
  * Everything else (user mgmt, product CRUD, profit, tier/voucher/campaign/
  * automation configuration, settings) is Admin-only.
- * MUST mirror supabase/migrations/0003 + 0011 role_permissions seeds.
+ * MUST mirror the role_permissions seeds across supabase/migrations (base in
+ * 0003/0011, plus per-feature migrations — e.g. 0032 grants staff tasks.view).
  */
 const STAFF_PERMS: PermissionKey[] = [
   "dashboard.view",
+  "tasks.view",
   "orders.view",
   "orders.create",
   "orders.edit",

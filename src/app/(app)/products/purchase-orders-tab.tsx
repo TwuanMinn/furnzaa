@@ -3,7 +3,7 @@
 
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ClipboardList, Loader2, PackageCheck, Plus, Trash2, XCircle } from "lucide-react";
+import { ClipboardList, Loader2, PackageCheck, Plus, XCircle } from "lucide-react";
 import { toast } from "sonner";
 
 import { DataTable, type DataTableColumn } from "@/components/datatable/data-table";
@@ -33,13 +33,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { OptionalSelect } from "@/components/ui/optional-select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -56,7 +50,8 @@ import { formatDate, formatMoney } from "@/lib/format";
 import type { FilterDef } from "@/lib/datatable/types";
 import type { PurchaseOrderItemRow, PurchaseOrderListRow } from "@/lib/datasets/purchase-orders";
 import type { SupplierListRow } from "@/lib/datasets/suppliers";
-import { ProductLinePicker, type ProductHit } from "@/app/(app)/orders/order-form-parts";
+import { type ProductHit } from "@/app/(app)/orders/order-form-parts";
+import { LineItemRow } from "./line-item-row";
 
 const PO_STATUS_BADGE: Record<string, string> = {
   draft: "bg-slate-100 text-slate-700 dark:bg-slate-400/10 dark:text-slate-300",
@@ -267,19 +262,14 @@ function CreatePoDialog({
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
               <Label htmlFor="po-supplier">Supplier</Label>
-              <Select value={supplierId || "__none__"} onValueChange={(v) => setSupplierId(v === "__none__" ? "" : v)}>
-                <SelectTrigger id="po-supplier" className="w-full">
-                  <SelectValue placeholder="Pick a supplier…" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__none__">Pick a supplier…</SelectItem>
-                  {suppliers.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.company_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <OptionalSelect
+                id="po-supplier"
+                value={supplierId}
+                onChange={setSupplierId}
+                placeholder="Pick a supplier…"
+                emptyLabel="Pick a supplier…"
+                options={suppliers.map((s) => ({ value: s.id, label: s.company_name }))}
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="po-date">Order date</Label>
@@ -305,30 +295,25 @@ function CreatePoDialog({
               </Button>
             </div>
             {lines.map((line) => (
-              <div key={line.key} className="grid grid-cols-[1fr_32px_64px_90px_32px] items-center gap-2">
-                <div className="truncate rounded-md border border-input bg-muted/30 px-2.5 py-2 text-sm">
-                  {line.product ? (
-                    <>
-                      <span className="font-medium">{line.product.name}</span>{" "}
-                      <span className="text-xs text-muted-foreground">{line.product.sku}</span>
-                    </>
-                  ) : (
-                    <span className="text-muted-foreground">Pick a product →</span>
-                  )}
-                </div>
-                <ProductLinePicker
-                  linked={false}
-                  onPick={(p) =>
-                    setLines((prev) =>
-                      prev.map((l) =>
-                        l.key === line.key
-                          ? { ...l, product: p, unitCost: l.unitCost || (p.selling_price_cents / 200).toFixed(2) }
-                          : l,
-                      ),
-                    )
-                  }
-                  onUnlink={() => undefined}
-                />
+              <LineItemRow
+                key={line.key}
+                product={line.product}
+                secondary={(p) => <span className="text-xs text-muted-foreground">{p.sku}</span>}
+                emptyLabel="Pick a product →"
+                onPick={(p) =>
+                  setLines((prev) =>
+                    prev.map((l) =>
+                      l.key === line.key
+                        ? { ...l, product: p, unitCost: l.unitCost || (p.selling_price_cents / 200).toFixed(2) }
+                        : l,
+                    ),
+                  )
+                }
+                onRemove={() => setLines((prev) => prev.filter((l) => l.key !== line.key))}
+                removeDisabled={lines.length === 1}
+                removeLabel="Remove line"
+                className="grid-cols-[1fr_32px_64px_90px_32px]"
+              >
                 <Input
                   type="number"
                   min={1}
@@ -353,18 +338,7 @@ function CreatePoDialog({
                     )
                   }
                 />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label="Remove line"
-                  disabled={lines.length === 1}
-                  onClick={() => setLines((prev) => prev.filter((l) => l.key !== line.key))}
-                  className="text-muted-foreground hover:text-destructive"
-                >
-                  <Trash2 />
-                </Button>
-              </div>
+              </LineItemRow>
             ))}
             <p className="text-right text-sm">
               Total: <span className="font-semibold tabular-nums">{formatMoney(totalCents)}</span>

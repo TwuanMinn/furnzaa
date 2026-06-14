@@ -3,8 +3,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { asRow, dbInsert, dbUpdate, type Tables } from "@/lib/supabase/types";
-import { requirePermission, ForbiddenError, UnauthorizedError } from "@/lib/rbac/guards";
+import { requirePermission } from "@/lib/rbac/guards";
 import { logActivity } from "@/lib/activity/log";
+import { fail, type ActionResult } from "@/lib/actions/result";
+
+export type { ActionResult };
 import {
   bulkUserActionSchema,
   inviteUserSchema,
@@ -19,14 +22,6 @@ import {
  * validation → privileged write (Supabase Auth admin API where needed) →
  * activity log. RLS + the protect_user_fields trigger back these up.
  */
-
-export type ActionResult = { ok: true } | { ok: false; error: string };
-
-function fail(e: unknown): { ok: false; error: string } {
-  if (e instanceof UnauthorizedError) return { ok: false, error: "You are not signed in." };
-  if (e instanceof ForbiddenError) return { ok: false, error: "You don't have permission to do that." };
-  return { ok: false, error: e instanceof Error ? e.message : "Something went wrong" };
-}
 
 function appUrl() {
   return process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";

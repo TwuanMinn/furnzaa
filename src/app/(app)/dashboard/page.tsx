@@ -13,6 +13,7 @@ import { StatusBadge, PriorityBadge } from "@/components/ui/status-badge";
 import { formatDateTime, formatMoney } from "@/lib/format";
 import { StatCards, type DashboardStats } from "./stat-cards";
 import { NowPrintingWidget } from "./now-printing";
+import { AssistantPanel } from "./assistant-panel";
 
 export const metadata = { title: "Dashboard" };
 
@@ -145,6 +146,11 @@ export default async function DashboardPage() {
         <p className="mt-1 text-sm text-muted-foreground">
           Your overview and quick actions for today.
         </p>
+      </div>
+
+      {/* ── AI assistant ────────────────────────────────────────────────── */}
+      <div className="mb-6">
+        <AssistantPanel />
       </div>
 
       {/* ── Stats (left) + Now Printing (right) ─────────────────────────── */}

@@ -9,6 +9,14 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { formatDate } from "@/lib/format";
 import type { HeatmapDay } from "@/app/api/users/[id]/heatmap/route";
 
+const MONTH_LABELS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+// Grid is Sunday-first (row 0 = Sun). Label only Mon/Wed/Fri, like GitHub,
+// to keep the axis from crowding 10px rows.
+const WEEKDAY_LABELS = ["", "Mon", "", "Wed", "", "Fri", ""];
+
 /**
  * GitHub-style 12-month activity heatmap fed by the user_activity_daily
  * rollup (incrementally maintained — one indexed read, never a log scan).
@@ -28,7 +36,7 @@ export function ActivityHeatmap({ userId }: { userId: string }) {
     },
   });
 
-  const { weeks, maxCount, total } = useMemo(() => {
+  const { weeks, monthLabels, maxCount, total } = useMemo(() => {
     const byDay = new Map<string, HeatmapDay>();
     for (const d of query.data ?? []) byDay.set(d.day, d);
 
@@ -54,7 +62,22 @@ export function ActivityHeatmap({ userId }: { userId: string }) {
       }
       weeks.push(week);
     }
-    return { weeks, maxCount: max, total };
+
+    // One month label per column where the month changes. Parse the month
+    // straight from the YYYY-MM-DD key (already built from local date parts) —
+    // never via new Date(key), which reinterprets it as UTC and can shift the
+    // month a day's worth in non-UTC zones.
+    let lastMonth = -1;
+    const monthLabels = weeks.map((week) => {
+      const first = week[0];
+      if (!first) return "";
+      const m = Number(first.day.slice(5, 7)) - 1;
+      if (m === lastMonth) return "";
+      lastMonth = m;
+      return MONTH_LABELS[m] ?? "";
+    });
+
+    return { weeks, monthLabels, maxCount: max, total };
   }, [query.data]);
 
   if (query.isLoading) return <Skeleton className="h-28 w-full rounded-md" />;
@@ -73,26 +96,51 @@ export function ActivityHeatmap({ userId }: { userId: string }) {
 
   return (
     <div className="space-y-1.5">
-      <div className="flex gap-[3px] overflow-x-auto pb-1" role="img" aria-label={`Activity heatmap: ${total} events in the last 12 months`}>
-        {weeks.map((week, w) => (
-          <div key={w} className="flex flex-col gap-[3px]">
-            {week.map((cell, d) => (
-              <Tooltip key={cell.day} delayDuration={50}>
-                <TooltipTrigger asChild>
-                  <motion.span
-                    initial={reduce ? false : { opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ duration: 0.2, delay: reduce ? 0 : Math.min((w * 7 + d) * 0.0008, 0.3) }}
-                    className={`size-[10px] shrink-0 rounded-[2px] ${level(cell.count)}`}
-                  />
-                </TooltipTrigger>
-                <TooltipContent side="top" className="text-xs">
-                  {formatDate(cell.day)}: {cell.logins} login(s), {cell.actions} action(s)
-                </TooltipContent>
-              </Tooltip>
+      <div
+        className="flex gap-1 overflow-x-auto pb-1"
+        role="img"
+        aria-label={`Activity heatmap: ${total} events in the last 12 months`}
+      >
+        {/* Weekday axis — pt offsets past the month-label row so Mon/Wed/Fri
+            line up with their grid rows. */}
+        <div className="flex shrink-0 flex-col gap-[3px] pt-[19px] pr-1 text-[9px] leading-none text-muted-foreground">
+          {WEEKDAY_LABELS.map((label, i) => (
+            <span key={i} className="flex h-[10px] items-center justify-end">
+              {label}
+            </span>
+          ))}
+        </div>
+        {/* Month-label row + the week grid, sharing one column pitch. */}
+        <div className="flex flex-col gap-[3px]">
+          <div className="flex h-4 gap-[3px] text-[9px] leading-none text-muted-foreground">
+            {monthLabels.map((label, w) => (
+              <span key={w} className="w-[10px] shrink-0 whitespace-nowrap">
+                {label}
+              </span>
             ))}
           </div>
-        ))}
+          <div className="flex gap-[3px]">
+            {weeks.map((week, w) => (
+              <div key={w} className="flex flex-col gap-[3px]">
+                {week.map((cell, d) => (
+                  <Tooltip key={cell.day} delayDuration={50}>
+                    <TooltipTrigger asChild>
+                      <motion.span
+                        initial={reduce ? false : { opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ duration: 0.2, delay: reduce ? 0 : Math.min((w * 7 + d) * 0.0008, 0.3) }}
+                        className={`size-[10px] shrink-0 rounded-[2px] ${level(cell.count)}`}
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                      {formatDate(cell.day)}: {cell.logins} login(s), {cell.actions} action(s)
+                    </TooltipContent>
+                  </Tooltip>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>{total.toLocaleString()} events in the last 12 months</span>

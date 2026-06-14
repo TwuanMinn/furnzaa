@@ -7,6 +7,7 @@ import { History, Loader2, Eraser, Bookmark } from "lucide-react";
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
+import { downloadFromFetch } from "@/lib/export/csv";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -46,18 +47,33 @@ export interface CalcMaterial {
   cost_per_gram_cents: number;
 }
 
+/** One user-entered "other cost" line (packaging, shipping, fees…). */
+export interface OtherCostItem {
+  id: string;
+  label: string;
+  amount: string; // numeric string, like the other fields
+}
+
 export type FormState = Record<
-  | "filamentCostPerKg" | "filamentUsedGrams" | "wastePercent" | "printTimeHours"
+  | "filamentCostPerKg" | "filamentUsedGrams" | "wastePercent" | "printTimeHours" | "printTimeMinutes"
   | "electricityRate" | "printerWatts" | "laborCost" | "sellingPrice"
-  | "otherCosts" | "targetMarginPercent" | "quantity",
+  | "targetMarginPercent" | "quantity",
   string
-> & { name: string; material: string; filamentSpoolKg: string };
+> & {
+  name: string;
+  material: string;
+  filamentSpoolKg: string;
+  otherCostItems: OtherCostItem[];
+};
 
 // ─── Reducer (#9) ────────────────────────────────────────────────────────────
 
 type FormAction =
   | { type: "SET_FIELD"; key: keyof FormState; value: string }
   | { type: "SET_MATERIAL"; key: string; prefillCost?: string }
+  | { type: "ADD_OTHER_COST"; id: string }
+  | { type: "REMOVE_OTHER_COST"; id: string }
+  | { type: "SET_OTHER_COST"; id: string; field: "label" | "amount"; value: string }
   | { type: "LOAD_ENTRY"; entry: SavedCalculation }
   | { type: "CLEAR"; defaultMaterial: string };
 
@@ -72,20 +88,43 @@ function formReducer(state: FormState, action: FormAction): FormState {
         filamentSpoolKg: "1", // prefilled cost is always ₫/kg from Settings
         ...(action.prefillCost != null ? { filamentCostPerKg: action.prefillCost } : {}),
       };
+    case "ADD_OTHER_COST":
+      return {
+        ...state,
+        otherCostItems: [...state.otherCostItems, { id: action.id, label: "", amount: "" }],
+      };
+    case "REMOVE_OTHER_COST":
+      return {
+        ...state,
+        otherCostItems: state.otherCostItems.filter((it) => it.id !== action.id),
+      };
+    case "SET_OTHER_COST":
+      return {
+        ...state,
+        otherCostItems: state.otherCostItems.map((it) =>
+          it.id === action.id ? { ...it, [action.field]: action.value } : it,
+        ),
+      };
     case "LOAD_ENTRY": {
       const e = action.entry;
+      const totalHours = Number(e.print_time_hours);
+      const hours = Math.floor(totalHours);
+      const minutes = Math.round((totalHours - hours) * 60);
       return {
         name: e.name,
         material: e.material,
         filamentCostPerKg: String(Number(e.filament_cost_per_kg)),
         filamentUsedGrams: String(Number(e.filament_used_grams)),
         wastePercent: String(Number(e.waste_percent)),
-        printTimeHours: String(Number(e.print_time_hours)),
+        printTimeHours: hours > 0 ? String(hours) : "",
+        printTimeMinutes: minutes > 0 ? String(minutes) : "",
         electricityRate: String(Number(e.electricity_rate)),
         printerWatts: String(Number(e.printer_watts)),
         laborCost: String(Number(e.labor_cost)),
         sellingPrice: String(Number(e.selling_price)),
-        otherCosts: String(Number(e.other_costs)),
+        // Saved history persists only the TOTAL other-costs (one numeric
+        // column), so a reused entry loads as a single line carrying that sum.
+        otherCostItems: [{ id: "oc-0", label: "", amount: String(Number(e.other_costs)) }],
         targetMarginPercent: String(Number(e.target_margin_percent)),
         quantity: "1",
         filamentSpoolKg: "1", // saved entries always stored as ₫/kg
@@ -106,16 +145,26 @@ function defaultsToForm(materialKey: string): FormState {
     filamentUsedGrams: "",
     wastePercent: String(CALC_DEFAULTS.wastePercent),
     printTimeHours: "",
+    printTimeMinutes: "",
     electricityRate: String(CALC_DEFAULTS.electricityRate),
     printerWatts: String(CALC_DEFAULTS.printerWatts),
     laborCost: "0",
     sellingPrice: "",
-    otherCosts: "0",
+    otherCostItems: [{ id: "oc-0", label: "", amount: "" }],
     targetMarginPercent: String(CALC_DEFAULTS.targetMarginPercent),
     quantity: "1",
     filamentSpoolKg: "1",
   };
 }
+
+/**
+ * Monotonic id source for new other-cost rows. Lives at module scope and is
+ * only ever bumped inside event handlers (never render/reducer) so React
+ * StrictMode's double-invoke can't desync it — same rule as the printer/trend
+ * row-id generators.
+ */
+let otherCostSeq = 0;
+const nextOtherCostId = () => `oc-new-${++otherCostSeq}`;
 
 /** Parse string to finite number, defaulting to 0 (#10: renamed from `n`). */
 const parseNum = (s: string) => {
@@ -129,18 +178,22 @@ function formToInputs(f: FormState): CalcInputs {
   // Normalize to ₫/kg: if user entered cost for a 3kg or 5kg spool, divide
   const filamentCostPerKg = rawCost / spoolKg;
 
+  const hours = parseNum(f.printTimeHours);
+  const minutes = parseNum(f.printTimeMinutes);
+  const printTimeHours = hours + (minutes / 60);
+
   return {
     name: f.name.trim(),
     material: f.material,
     filamentCostPerKg,
     filamentUsedGrams: parseNum(f.filamentUsedGrams),
     wastePercent: parseNum(f.wastePercent),
-    printTimeHours: parseNum(f.printTimeHours),
+    printTimeHours,
     electricityRate: parseNum(f.electricityRate),
     printerWatts: parseNum(f.printerWatts),
     laborCost: parseNum(f.laborCost),
     sellingPrice: parseNum(f.sellingPrice),
-    otherCosts: parseNum(f.otherCosts),
+    otherCosts: f.otherCostItems.reduce((sum, it) => sum + parseNum(it.amount), 0),
     targetMarginPercent: parseNum(f.targetMarginPercent),
     quantity: Math.max(parseNum(f.quantity), 1),
   };
@@ -198,6 +251,21 @@ export function CostCalculator({
   const onFieldChange = useCallback((key: keyof FormState, value: string) => {
     dispatch({ type: "SET_FIELD", key, value });
   }, []);
+
+  const onAddOtherCost = useCallback(() => {
+    dispatch({ type: "ADD_OTHER_COST", id: nextOtherCostId() });
+  }, []);
+
+  const onRemoveOtherCost = useCallback((id: string) => {
+    dispatch({ type: "REMOVE_OTHER_COST", id });
+  }, []);
+
+  const onOtherCostChange = useCallback(
+    (id: string, field: "label" | "amount", value: string) => {
+      dispatch({ type: "SET_OTHER_COST", id, field, value });
+    },
+    [],
+  );
 
   const onMaterialChange = useCallback(
     (key: string) => {
@@ -320,18 +388,10 @@ export function CostCalculator({
   async function exportFile(format: "csv" | "pdf") {
     setExporting(format);
     try {
-      const res = await fetch(`/api/export/cost-calculations?format=${format}`);
-      if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(body?.error ?? `Export failed (${res.status})`);
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `cost-calculations.${format}`;
-      a.click();
-      URL.revokeObjectURL(url);
+      await downloadFromFetch(
+        `/api/export/cost-calculations?format=${format}`,
+        `cost-calculations.${format}`,
+      );
       toast.success(`Exported ${format.toUpperCase()}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Export failed");
@@ -421,6 +481,9 @@ export function CostCalculator({
               materials={materials}
               onFieldChange={onFieldChange}
               onMaterialChange={onMaterialChange}
+              onAddOtherCost={onAddOtherCost}
+              onRemoveOtherCost={onRemoveOtherCost}
+              onOtherCostChange={onOtherCostChange}
             />
 
             {/* ── Action bar ──────────────────────────────────────── */}

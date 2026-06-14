@@ -43,16 +43,11 @@ import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/states";
 import { badgeClass } from "@/lib/badges";
-import { formatDate, formatDateTime, formatMinutes, formatMoney } from "@/lib/format";
+import { formatDate, formatDateTime, formatMinutes, formatMoney, toDateKey } from "@/lib/format";
+import { downloadFromFetch } from "@/lib/export/csv";
 import type { AnalyticsData } from "@/lib/datasets/analytics";
 
 const CHART_COLORS = ["#6366f1", "#10b981", "#f59e0b", "#a855f7", "#ef4444", "#0ea5e9"];
-
-function localDate(daysAgo = 0): string {
-  const d = new Date();
-  d.setDate(d.getDate() - daysAgo);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
 
 const PRESETS = [
   { label: "30d", days: 30 },
@@ -73,8 +68,8 @@ export function AnalyticsClient({
   priorities: StatusDef[];
 }) {
   const reduce = useReducedMotion();
-  const [from, setFrom] = useState<string>(localDate(90));
-  const [to, setTo] = useState<string>(localDate(0));
+  const [from, setFrom] = useState<string>(toDateKey(90));
+  const [to, setTo] = useState<string>(toDateKey(0));
   const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
 
   const query = useQuery({
@@ -111,15 +106,7 @@ export function AnalyticsClient({
       const params = new URLSearchParams({ format });
       if (from) params.set("f_from", from);
       if (to) params.set("f_to", to);
-      const res = await fetch(`/api/export/analytics?${params}`);
-      if (!res.ok) throw new Error("Export failed");
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `analytics.${format}`;
-      a.click();
-      URL.revokeObjectURL(url);
+      await downloadFromFetch(`/api/export/analytics?${params}`, `analytics.${format}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Export failed");
     } finally {
@@ -187,8 +174,8 @@ export function AnalyticsClient({
               size="sm"
               variant="outline"
               onClick={() => {
-                setFrom(p.days ? localDate(p.days) : "");
-                setTo(localDate(0));
+                setFrom(p.days ? toDateKey(p.days) : "");
+                setTo(toDateKey(0));
               }}
             >
               {p.label}
