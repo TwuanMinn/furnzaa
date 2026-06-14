@@ -6,6 +6,7 @@ import { getOrgBranding } from "@/lib/export/branding";
 import { getOrderConfig } from "@/lib/orders/config";
 import { PageHeader } from "@/components/states";
 import { ProfitTabs } from "./profit-tabs";
+import type { ProfitSharingConfig } from "@/lib/profit/sharing";
 
 export const metadata = { title: "Profit & Cost Analysis" };
 
@@ -26,11 +27,15 @@ export default async function Page() {
     getOrderConfig(),
     supabase
       .from("user_preferences")
-      .select("date_format, time_format")
+      .select("date_format, time_format, profit_sharing_config")
       .eq("user_id", user.id)
       .maybeSingle(),
   ]);
-  const prefs = asRow<{ date_format: string; time_format: string }>(prefsRes.data);
+  const prefs = asRow<{
+    date_format: string;
+    time_format: string;
+    profit_sharing_config: ProfitSharingConfig | null;
+  }>(prefsRes.data);
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 px-6 py-8">
@@ -47,6 +52,7 @@ export default async function Page() {
         }))}
         dateFormat={prefs?.date_format || "d/M/yyyy"}
         timeFormat={prefs?.time_format || "HH:mm:ss"}
+        initialSharing={prefs?.profit_sharing_config ?? null}
       />
     </div>
   );

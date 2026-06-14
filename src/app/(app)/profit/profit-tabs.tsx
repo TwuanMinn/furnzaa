@@ -3,12 +3,13 @@
 import { useState } from "react";
 import dynamic from "next/dynamic";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { Calculator, ChartNoAxesCombined } from "lucide-react";
+import { Calculator, ChartNoAxesCombined, Handshake } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ProfitClient } from "./profit-client";
 import type { CalcMaterial } from "./cost-calculator";
+import type { ProfitSharingConfig } from "@/lib/profit/sharing";
 
 /**
  * Module 4's two top-level sections behind an animated segmented control:
@@ -29,9 +30,23 @@ const CostCalculator = dynamic(
   },
 );
 
+const ProfitSharing = dynamic(
+  () => import("./profit-sharing").then((m) => m.ProfitSharing),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="space-y-3">
+        <Skeleton className="h-24 w-full rounded-xl" />
+        <Skeleton className="h-48 w-full rounded-xl" />
+      </div>
+    ),
+  },
+);
+
 const TABS = [
   { key: "dashboard", label: "Profitability Dashboard", icon: ChartNoAxesCombined },
   { key: "calculator", label: "Cost Calculator", icon: Calculator },
+  { key: "sharing", label: "Profit Sharing", icon: Handshake },
 ] as const;
 
 type TabKey = (typeof TABS)[number]["key"];
@@ -41,11 +56,13 @@ export function ProfitTabs({
   materials,
   dateFormat,
   timeFormat,
+  initialSharing,
 }: {
   currency: string;
   materials: CalcMaterial[];
   dateFormat: string;
   timeFormat: string;
+  initialSharing: ProfitSharingConfig | null;
 }) {
   const reduce = useReducedMotion();
   const [tab, setTab] = useState<TabKey>("dashboard");
@@ -55,7 +72,7 @@ export function ProfitTabs({
       <div
         role="tablist"
         aria-label="Profit & Cost Analysis sections"
-        className="relative inline-grid grid-cols-2 rounded-xl border border-border bg-muted/40 p-1"
+        className="relative inline-grid grid-cols-3 rounded-xl border border-border bg-muted/40 p-1"
       >
         {TABS.map((t) => (
           <button
@@ -92,13 +109,15 @@ export function ProfitTabs({
         >
           {tab === "dashboard" ? (
             <ProfitClient currency={currency} />
-          ) : (
+          ) : tab === "calculator" ? (
             <CostCalculator
               materials={materials}
               currency={currency}
               dateFormat={dateFormat}
               timeFormat={timeFormat}
             />
+          ) : (
+            <ProfitSharing initialConfig={initialSharing} defaultCurrency={currency} />
           )}
         </motion.div>
       </AnimatePresence>

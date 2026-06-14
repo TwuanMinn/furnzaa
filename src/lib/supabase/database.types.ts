@@ -4741,6 +4741,7 @@ export type Database = {
           default_landing_page: string
           language: string
           notification_prefs: Json
+          profit_sharing_config: Json | null
           sidebar_collapsed: boolean
           sidebar_default_state: string
           theme: string
@@ -4755,6 +4756,7 @@ export type Database = {
           default_landing_page?: string
           language?: string
           notification_prefs?: Json
+          profit_sharing_config?: Json | null
           sidebar_collapsed?: boolean
           sidebar_default_state?: string
           theme?: string
@@ -4769,6 +4771,7 @@ export type Database = {
           default_landing_page?: string
           language?: string
           notification_prefs?: Json
+          profit_sharing_config?: Json | null
           sidebar_collapsed?: boolean
           sidebar_default_state?: string
           theme?: string
