@@ -7,7 +7,6 @@ import { asRow, asRows, dbInsert, dbUpdate, rpcParams } from "@/lib/supabase/typ
 import { nextDocumentNumber } from "@/lib/supabase/document-number";
 import { requirePermission } from "@/lib/rbac/guards";
 import { fail, type ActionResult } from "@/lib/actions/result";
-export type { ActionResult };
 import { logActivity } from "@/lib/activity/log";
 import { notifyLowStock } from "@/lib/notifications/service";
 import { getOrgSettings } from "@/lib/settings/config";

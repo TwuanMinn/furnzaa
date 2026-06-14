@@ -6,8 +6,6 @@ import { asRow, dbInsert, dbUpdate, type Tables } from "@/lib/supabase/types";
 import { requirePermission } from "@/lib/rbac/guards";
 import { logActivity } from "@/lib/activity/log";
 import { fail, type ActionResult } from "@/lib/actions/result";
-
-export type { ActionResult };
 import {
   bulkUserActionSchema,
   inviteUserSchema,
