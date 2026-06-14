@@ -7,7 +7,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const PILL_CLASS =
-  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset";
+  "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ring-1 ring-inset transition-[color,box-shadow] duration-150";
 
 /** Sentence-case a raw status/priority value for display. */
 function capitalize(s: string): string {
