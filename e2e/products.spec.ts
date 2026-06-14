@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { uniq } from "./helpers";
 
 /**
  * Exercises the shared LineItemRow editor + the nextDocumentNumber() wrapper by
@@ -37,4 +38,46 @@ test("creates a purchase order (LineItemRow + generated PO number)", async ({ pa
   await expect(
     page.locator("[data-sonner-toast]").filter({ hasText: /Purchase order PO-\S+ created/ }),
   ).toBeVisible({ timeout: 25000 });
+});
+
+/**
+ * createProductAction runs the nextDocumentNumber() SKU path — the same
+ * products/actions.ts module that the ActionResult re-export crash broke.
+ */
+test("creates a product (createProductAction + auto SKU)", async ({ page }) => {
+  await page.goto("/products"); // Products is the default tab
+  await page.getByRole("button", { name: "New product" }).click();
+
+  const dialog = page.getByRole("dialog");
+  await dialog.locator("#pf-name").fill(uniq("Smoke Product"));
+  await dialog.locator("#pf-cost").fill("10000");
+  await dialog.locator("#pf-sell").fill("25000");
+  await dialog.getByRole("button", { name: "Create product" }).click();
+
+  await expect(
+    page.locator("[data-sonner-toast]").filter({ hasText: /Product created/ }),
+  ).toBeVisible({ timeout: 20000 });
+});
+
+/**
+ * adjustStockAction routes through the locking apply_inventory_movement RPC —
+ * the only manual write path to stock. Opened from the Stock-ledger tab's
+ * "Record movement" picker.
+ */
+test("records a stock movement (adjustStockAction)", async ({ page }) => {
+  await page.goto("/products");
+  await page.getByRole("tab", { name: "Stock ledger" }).click();
+
+  await page.getByRole("button", { name: "Pick a catalog product" }).click();
+  await page.getByPlaceholder(/Search products by name/i).fill("Phone");
+  await page.getByRole("button", { name: /Phone Stand/i }).first().click();
+
+  // AdjustStockDialog defaults to Purchase / stock-in, so +qty never goes negative.
+  const dialog = page.getByRole("dialog");
+  await dialog.locator("#adj-qty").fill("2");
+  await dialog.getByRole("button", { name: "Record movement" }).click();
+
+  await expect(
+    page.locator("[data-sonner-toast]").filter({ hasText: /in stock/ }),
+  ).toBeVisible({ timeout: 20000 });
 });
