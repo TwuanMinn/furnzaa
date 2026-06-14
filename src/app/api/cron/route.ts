@@ -427,6 +427,12 @@ async function runCron() {
   return results;
 }
 
+// Never cache — this is auth-gated and mutates state on every invocation.
+export const dynamic = "force-dynamic";
+// The runner does many sequential steps; give it headroom past the 10s default
+// (60s is the Hobby ceiling; Pro allows more). Tune up if the org grows large.
+export const maxDuration = 60;
+
 export async function POST(req: Request) {
   if (!authorized(req)) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
@@ -435,5 +441,6 @@ export async function POST(req: Request) {
   return NextResponse.json({ ok: true, data: results });
 }
 
-// GET supported for schedulers that can't POST.
+// GET supported for schedulers that can't POST (incl. Vercel Cron, which sends
+// GET with `Authorization: Bearer $CRON_SECRET` when CRON_SECRET is set).
 export const GET = POST;
