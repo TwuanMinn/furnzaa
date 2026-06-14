@@ -177,6 +177,22 @@
   }
 }
 
+/* Route transition: page content fades + rises on each navigation. NO
+   animation-fill-mode, so the element's RESTING state is always its natural
+   (fully visible) state — it can only be transparent DURING the brief
+   animation, never stuck at opacity:0 (the failure mode of fill-mode-based
+   approaches). The prefers-reduced-motion guard below zeroes its duration. */
+@keyframes route-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -205,6 +221,9 @@
 
 /* Thin, theme-aware scrollbars */
 @layer utilities {
+  .animate-route-enter {
+    animation: route-enter 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+  }
   .scrollbar-thin {
     scrollbar-width: thin;
     scrollbar-color: var(--border) transparent;
