@@ -4077,6 +4077,59 @@ export type Database = {
           },
         ]
       }
+      profit_sharing_records: {
+        Row: {
+          created_at: string
+          created_by: string
+          created_by_name: string
+          currency: string
+          deleted_at: string | null
+          id: string
+          is_active: boolean
+          label: string
+          note: string
+          partner_count: number
+          partners: Json
+          total: number
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          created_by_name?: string
+          currency?: string
+          deleted_at?: string | null
+          id?: string
+          is_active?: boolean
+          label?: string
+          note?: string
+          partner_count?: number
+          partners?: Json
+          total?: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          created_by_name?: string
+          currency?: string
+          deleted_at?: string | null
+          id?: string
+          is_active?: boolean
+          label?: string
+          note?: string
+          partner_count?: number
+          partners?: Json
+          total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profit_sharing_records_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       purchase_order_items: {
         Row: {
           id: string

@@ -117,7 +117,12 @@ export function ProfitTabs({
               timeFormat={timeFormat}
             />
           ) : (
-            <ProfitSharing initialConfig={initialSharing} defaultCurrency={currency} />
+            <ProfitSharing
+              initialConfig={initialSharing}
+              defaultCurrency={currency}
+              dateFormat={dateFormat}
+              timeFormat={timeFormat}
+            />
           )}
         </motion.div>
       </AnimatePresence>
