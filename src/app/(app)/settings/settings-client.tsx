@@ -15,6 +15,7 @@ import {
   MessageSquareWarning,
   MessagesSquare,
   Package,
+  PiggyBank,
   Printer,
   Settings2,
   Shield,
@@ -62,6 +63,10 @@ const FeedbackSection = dynamic(
   () => import("./sections/feedback-section").then((m) => m.FeedbackSection),
   { loading: sectionLoading },
 );
+const RoiSection = dynamic(
+  () => import("./sections/roi-section").then((m) => m.RoiSection),
+  { loading: sectionLoading },
+);
 const MessagingSection = dynamic(
   () => import("./sections/messaging-section").then((m) => m.MessagingSection),
   { loading: sectionLoading },
@@ -102,6 +107,7 @@ const SECTION_META: {
   { id: "schedule", label: "Schedule", icon: CalendarClock, group: "Organization" },
   { id: "trending", label: "Trending", icon: Flame, group: "Organization" },
   { id: "feedback", label: "Feedback", icon: MessageSquareWarning, group: "Organization" },
+  { id: "roi", label: "ROI & Investment", icon: PiggyBank, group: "Organization" },
   { id: "messaging", label: "Messaging", icon: MessagesSquare, group: "Organization" },
   { id: "inventory", label: "Inventory", icon: Package, group: "Organization" },
   { id: "loyalty", label: "Loyalty", icon: Star, group: "Organization" },
@@ -221,6 +227,9 @@ export function SettingsClient({
             )}
             {active === "feedback" && bundle.feedback && (
               <FeedbackSection data={bundle.feedback.data} canEdit={bundle.feedback.canEdit} />
+            )}
+            {active === "roi" && bundle.roi && (
+              <RoiSection data={bundle.roi.data} canEdit={bundle.roi.canEdit} />
             )}
             {active === "messaging" && bundle.messaging && (
               <MessagingSection

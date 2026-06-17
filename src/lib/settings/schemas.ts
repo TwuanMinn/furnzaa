@@ -251,6 +251,25 @@ export const feedbackConfigSchema = z
   );
 export type FeedbackConfigInput = z.infer<typeof feedbackConfigSchema>;
 
+// ── ROI / Investment configuration ─────────────────────────────────────────────
+
+export const roiConfigSchema = z.object({
+  targetRoiPct: z.number().min(0, "Cannot be negative").max(1000, "Max 1000%"),
+  defaultPaybackMonths: z.number().int().min(0).max(600),
+  trailingWindowMonths: z.number().int().min(1, "Min 1 month").max(60, "Max 60 months"),
+  autoAttributionEnabled: z.boolean(),
+});
+export type RoiConfigInput = z.infer<typeof roiConfigSchema>;
+
+/** A shared investment_categories / investment_projects row edit. Color is a
+ *  display-only badge token (the picker only emits valid ones). */
+export const investmentRefSchema = z.object({
+  id: z.string().uuid().optional(),
+  name: z.string().trim().min(1, "Name is required").max(80),
+  color: z.string().trim().min(1).max(20),
+});
+export type InvestmentRefInput = z.infer<typeof investmentRefSchema>;
+
 // ── Messaging configuration ───────────────────────────────────────────────────
 
 export const messagingConfigSchema = z.object({

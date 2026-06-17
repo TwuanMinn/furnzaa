@@ -36,6 +36,7 @@ export default async function Page({
     showOrg("settings.edit_order_config") ||
     showOrg("settings.edit_trending") ||
     showOrg("settings.edit_feedback") ||
+    showOrg("settings.edit_roi") ||
     showOrg("settings.edit_messaging") ||
     showOrg("settings.edit_inventory") ||
     showOrg("settings.edit_loyalty") ||
@@ -43,7 +44,7 @@ export default async function Page({
     showOrg("settings.edit_data") ||
     showOrg("settings.edit_security");
 
-  const [profileRes, prefsRes, org, printersRes, warehousesRes, staffPermsRes] =
+  const [profileRes, prefsRes, org, printersRes, warehousesRes, staffPermsRes, roiCatsRes, roiProjsRes] =
     await Promise.all([
       supabase
         .from("users")
@@ -76,6 +77,24 @@ export default async function Page({
             .select("roles!inner(key), permissions(key)")
             .eq("roles.key", "staff")
             .limit(500)
+        : Promise.resolve({ data: null }),
+      showOrg("settings.edit_roi")
+        ? supabase
+            .from("investment_categories")
+            .select("id, name, color, is_active")
+            .is("deleted_at", null)
+            .order("sort_order")
+            .order("name")
+            .limit(200)
+        : Promise.resolve({ data: null }),
+      showOrg("settings.edit_roi")
+        ? supabase
+            .from("investment_projects")
+            .select("id, name, color, is_active")
+            .is("deleted_at", null)
+            .order("sort_order")
+            .order("name")
+            .limit(200)
         : Promise.resolve({ data: null }),
     ]);
 
@@ -208,6 +227,23 @@ export default async function Page({
           channels: org.feedback.channels,
           agingSlaDays: org.feedback.aging_sla_days,
           negativeAlertEnabled: org.feedback.negative_alert_enabled,
+        },
+      };
+    }
+    if (showOrg("settings.edit_roi")) {
+      bundle.roi = {
+        canEdit: editable("settings.edit_roi"),
+        data: {
+          targetRoiPct: org.roi.target_roi_pct,
+          defaultPaybackMonths: org.roi.default_payback_months,
+          trailingWindowMonths: org.roi.trailing_window_months,
+          autoAttributionEnabled: org.roi.auto_attribution_enabled,
+          categories: asRows<{ id: string; name: string; color: string; is_active: boolean }>(
+            roiCatsRes.data,
+          ).map((c) => ({ id: c.id, name: c.name, color: c.color, isActive: c.is_active })),
+          projects: asRows<{ id: string; name: string; color: string; is_active: boolean }>(
+            roiProjsRes.data,
+          ).map((p) => ({ id: p.id, name: p.name, color: p.color, isActive: p.is_active })),
         },
       };
     }

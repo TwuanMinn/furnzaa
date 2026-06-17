@@ -23,6 +23,7 @@ import {
   MessageSquare,
   MessageSquareWarning,
   CircleDollarSign,
+  PiggyBank,
   BarChart3,
   Settings,
   MoreHorizontal,
@@ -56,7 +57,7 @@ interface SidebarItem {
   href: string;
   icon: LucideIcon;
   permission?: PermissionKey;
-  badgeKey?: "orders" | "lowStock" | "notifications" | "printing" | "feedback" | "messages";
+  badgeKey?: "orders" | "lowStock" | "notifications" | "printing" | "feedback" | "messages" | "roi";
 }
 
 interface SidebarSection {
@@ -91,6 +92,7 @@ const SECTIONS: SidebarSection[] = [
       { label: "Notifications", href: "/notifications", icon: Bell, permission: "notifications.view", badgeKey: "notifications" },
       { label: "Messages", href: "/messages", icon: MessageSquare, permission: "messages.view", badgeKey: "messages" },
       { label: "Profit", href: "/profit", icon: CircleDollarSign, permission: "profit.view" },
+      { label: "ROI", href: "/roi", icon: PiggyBank, permission: "roi.view", badgeKey: "roi" },
       { label: "Activity log", href: "/activity", icon: BarChart3, permission: "logs.view" },
     ],
   },
@@ -123,6 +125,7 @@ export function AppSidebar({ initialCollapsed }: { initialCollapsed: boolean }) 
         printing: number;
         feedback: number;
         messages: number;
+        roi: number;
       };
     },
     refetchInterval: 30_000,
@@ -146,6 +149,7 @@ export function AppSidebar({ initialCollapsed }: { initialCollapsed: boolean }) 
     printing: counts?.printing ?? 0,
     feedback: counts?.feedback ?? 0,
     messages: counts?.messages ?? 0,
+    roi: counts?.roi ?? 0,
     notifications: notificationsData?.unread ?? 0,
   };
 

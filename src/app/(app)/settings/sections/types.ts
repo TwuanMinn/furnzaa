@@ -17,6 +17,7 @@ export type SectionId =
   | "schedule"
   | "trending"
   | "feedback"
+  | "roi"
   | "messaging"
   | "inventory"
   | "loyalty"
@@ -91,6 +92,15 @@ export interface FeedbackConfigData {
   negativeAlertEnabled: boolean;
 }
 
+export interface RoiConfigData {
+  targetRoiPct: number;
+  defaultPaybackMonths: number;
+  trailingWindowMonths: number;
+  autoAttributionEnabled: boolean;
+  categories: { id: string; name: string; color: string; isActive: boolean }[];
+  projects: { id: string; name: string; color: string; isActive: boolean }[];
+}
+
 export interface MessagingData {
   reactionEmojis: string[];
   inviteExpiryHours: number;
@@ -153,6 +163,7 @@ export interface SettingsBundle {
   schedule?: { data: ScheduleConfigData; canEdit: boolean };
   trending?: { data: TrendingConfigData; canEdit: boolean };
   feedback?: { data: FeedbackConfigData; canEdit: boolean };
+  roi?: { data: RoiConfigData; canEdit: boolean };
   messaging?: { data: MessagingData; canEdit: boolean };
   inventory?: { data: InventoryData; canEdit: boolean };
   loyalty?: { data: LoyaltyData; canEdit: boolean };

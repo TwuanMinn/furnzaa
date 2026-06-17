@@ -95,12 +95,24 @@ export const GET = withAuth(async (req, { user }) => {
       messagesCount = rows.reduce((sum, r) => sum + Number(r.unread_count ?? 0), 0);
     }
 
+    // 6. Underperforming investments (ROI badge) — from the cached portfolio MV
+    //    (global; ROI is admin-only by default), behind roi.view.
+    let roiCount = 0;
+    if (user.permissions.has("roi.view")) {
+      const { data: roiRes } = await createAdminClient()
+        .from("mv_roi_portfolio")
+        .select("underperforming_count")
+        .maybeSingle();
+      roiCount = Number((roiRes as { underperforming_count: number } | null)?.underperforming_count ?? 0);
+    }
+
     return jsonOk({
       orders: ordersCount ?? 0,
       lowStock: lowStockCount,
       printing: printingCount,
       feedback: feedbackCount,
       messages: messagesCount,
+      roi: roiCount,
     });
   } catch (e) {
     return jsonError(e instanceof Error ? e.message : "Failed to load sidebar counts", 500);

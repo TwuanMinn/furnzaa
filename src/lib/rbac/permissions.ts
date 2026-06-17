@@ -32,6 +32,7 @@ export type PermissionModule =
   | "messages"
   | "logs"
   | "analytics"
+  | "roi"
   | "settings";
 
 export interface PermissionDef {
@@ -95,6 +96,12 @@ export const PERMISSIONS = [
   { key: "profit.view", module: "profit", description: "View profit & cost analysis" },
   { key: "profit.export", module: "profit", description: "Export profit & cost analysis" },
 
+  { key: "roi.view", module: "roi", description: "View ROI & investment recovery" },
+  { key: "roi.create", module: "roi", description: "Create investments and add ledger entries" },
+  { key: "roi.edit", module: "roi", description: "Edit investments and ledger entries" },
+  { key: "roi.delete", module: "roi", description: "Delete investments and ledger entries" },
+  { key: "roi.manage", module: "roi", description: "Manage ROI categories, projects and config" },
+
   { key: "crm.view", module: "crm", description: "View customer segments, tiers & rank history" },
   { key: "crm.manage_tiers", module: "crm", description: "Configure tiers, benefits & manual overrides" },
   { key: "vouchers.view", module: "crm", description: "View vouchers & redemptions" },
@@ -142,6 +149,7 @@ export const PERMISSIONS = [
   { key: "settings.edit_marketing", module: "settings", description: "Edit marketing configuration" },
   { key: "settings.edit_data", module: "settings", description: "Manage data import/export/retention" },
   { key: "settings.edit_security", module: "settings", description: "Edit security settings" },
+  { key: "settings.edit_roi", module: "settings", description: "Edit ROI / investment configuration" },
 ] as const satisfies readonly PermissionDef[];
 
 export type PermissionKey = (typeof PERMISSIONS)[number]["key"];

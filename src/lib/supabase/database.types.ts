@@ -2555,6 +2555,322 @@ export type Database = {
           },
         ]
       }
+      investment_cash_flows: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          entry_date: string
+          flow_type: string
+          id: string
+          investment_id: string
+          is_active: boolean
+          notes: string | null
+          period_month: string
+          reference_id: string | null
+          reference_type: string | null
+          source: string
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          entry_date?: string
+          flow_type: string
+          id?: string
+          investment_id: string
+          is_active?: boolean
+          notes?: string | null
+          period_month: string
+          reference_id?: string | null
+          reference_type?: string | null
+          source?: string
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          entry_date?: string
+          flow_type?: string
+          id?: string
+          investment_id?: string
+          is_active?: boolean
+          notes?: string | null
+          period_month?: string
+          reference_id?: string | null
+          reference_type?: string | null
+          source?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investment_cash_flows_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investment_cash_flows_investment_id_fkey"
+            columns: ["investment_id"]
+            isOneToOne: false
+            referencedRelation: "investments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      investment_categories: {
+        Row: {
+          color: string
+          created_at: string
+          deleted_at: string | null
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      investment_monthly_rollup: {
+        Row: {
+          capital_cents: number
+          cost_cents: number
+          id: string
+          investment_id: string
+          period_month: string
+          revenue_cents: number
+          updated_at: string
+        }
+        Insert: {
+          capital_cents?: number
+          cost_cents?: number
+          id?: string
+          investment_id: string
+          period_month: string
+          revenue_cents?: number
+          updated_at?: string
+        }
+        Update: {
+          capital_cents?: number
+          cost_cents?: number
+          id?: string
+          investment_id?: string
+          period_month?: string
+          revenue_cents?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investment_monthly_rollup_investment_id_fkey"
+            columns: ["investment_id"]
+            isOneToOne: false
+            referencedRelation: "investments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      investment_projects: {
+        Row: {
+          color: string
+          created_at: string
+          deleted_at: string | null
+          id: string
+          is_active: boolean
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          deleted_at?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      investments: {
+        Row: {
+          assigned_to: string | null
+          attribution_product_ids: string[] | null
+          break_even_at: string | null
+          break_even_notified_at: string | null
+          break_even_status: string
+          category_id: string | null
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          description: string | null
+          expected_payback_months: number | null
+          id: string
+          is_active: boolean
+          last_activity_at: string | null
+          name: string
+          notes: string | null
+          project_id: string | null
+          recovered_cents: number
+          recovery_pct: number
+          remaining_cents: number
+          roi_pct: number
+          start_date: string
+          status: string
+          total_capital_cents: number
+          total_cost_cents: number
+          total_revenue_cents: number
+          underperforming_notified_at: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          attribution_product_ids?: string[] | null
+          break_even_at?: string | null
+          break_even_notified_at?: string | null
+          break_even_status?: string
+          category_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          expected_payback_months?: number | null
+          id?: string
+          is_active?: boolean
+          last_activity_at?: string | null
+          name: string
+          notes?: string | null
+          project_id?: string | null
+          recovered_cents?: number
+          recovery_pct?: number
+          remaining_cents?: number
+          roi_pct?: number
+          start_date?: string
+          status?: string
+          total_capital_cents?: number
+          total_cost_cents?: number
+          total_revenue_cents?: number
+          underperforming_notified_at?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          attribution_product_ids?: string[] | null
+          break_even_at?: string | null
+          break_even_notified_at?: string | null
+          break_even_status?: string
+          category_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          expected_payback_months?: number | null
+          id?: string
+          is_active?: boolean
+          last_activity_at?: string | null
+          name?: string
+          notes?: string | null
+          project_id?: string | null
+          recovered_cents?: number
+          recovery_pct?: number
+          remaining_cents?: number
+          roi_pct?: number
+          start_date?: string
+          status?: string
+          total_capital_cents?: number
+          total_cost_cents?: number
+          total_revenue_cents?: number
+          underperforming_notified_at?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investments_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investments_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "investment_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investments_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "mv_roi_category"
+            referencedColumns: ["category_id"]
+          },
+          {
+            foreignKeyName: "investments_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "investment_projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "investments_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "mv_roi_project"
+            referencedColumns: ["project_id"]
+          },
+          {
+            foreignKeyName: "investments_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       login_attempts: {
         Row: {
           attempted_at: string
@@ -3389,6 +3705,7 @@ export type Database = {
           order_priorities: Json
           order_statuses: Json
           password_policy: Json
+          roi_config: Json | null
           schedule_config: Json
           session_timeout_min: number
           sku_format: string
@@ -3426,6 +3743,7 @@ export type Database = {
           order_priorities?: Json
           order_statuses?: Json
           password_policy?: Json
+          roi_config?: Json | null
           schedule_config?: Json
           session_timeout_min?: number
           sku_format?: string
@@ -3463,6 +3781,7 @@ export type Database = {
           order_priorities?: Json
           order_statuses?: Json
           password_policy?: Json
+          roi_config?: Json | null
           schedule_config?: Json
           session_timeout_min?: number
           sku_format?: string
@@ -5370,6 +5689,52 @@ export type Database = {
         }
         Relationships: []
       }
+      mv_roi_category: {
+        Row: {
+          category_color: string | null
+          category_id: string | null
+          category_name: string | null
+          investment_count: number | null
+          recovered_cents: number | null
+          recovery_pct: number | null
+          remaining_cents: number | null
+          roi_pct: number | null
+          total_capital_cents: number | null
+        }
+        Relationships: []
+      }
+      mv_roi_portfolio: {
+        Row: {
+          id: number | null
+          in_progress_count: number | null
+          investment_count: number | null
+          recovered_cents: number | null
+          recovered_count: number | null
+          recovery_pct: number | null
+          refreshed_at: string | null
+          remaining_cents: number | null
+          roi_pct: number | null
+          total_capital_cents: number | null
+          total_cost_cents: number | null
+          total_revenue_cents: number | null
+          underperforming_count: number | null
+        }
+        Relationships: []
+      }
+      mv_roi_project: {
+        Row: {
+          investment_count: number | null
+          project_color: string | null
+          project_id: string | null
+          project_name: string | null
+          recovered_cents: number | null
+          recovery_pct: number | null
+          remaining_cents: number | null
+          roi_pct: number | null
+          total_capital_cents: number | null
+        }
+        Relationships: []
+      }
       mv_summary_stats: {
         Row: {
           active_customers_90d: number | null
@@ -5391,6 +5756,31 @@ export type Database = {
         }
         Relationships: []
       }
+      v_investment_monthly: {
+        Row: {
+          capital_cents: number | null
+          cost_cents: number | null
+          cumulative_invested_cents: number | null
+          cumulative_profit_cents: number | null
+          id: string | null
+          investment_id: string | null
+          period_month: string | null
+          profit_cents: number | null
+          recovery_to_date_pct: number | null
+          remaining_recovery_cents: number | null
+          revenue_cents: number | null
+          roi_to_date_pct: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investment_monthly_rollup_investment_id_fkey"
+            columns: ["investment_id"]
+            isOneToOne: false
+            referencedRelation: "investments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       apply_inventory_movement: {
@@ -5404,6 +5794,19 @@ export type Database = {
           p_reference_type?: string
           p_variant_id?: string
           p_warehouse_id?: string
+        }
+        Returns: string
+      }
+      apply_investment_cash_flow: {
+        Args: {
+          p_amount_cents: number
+          p_entry_date?: string
+          p_flow_type: string
+          p_investment_id: string
+          p_notes?: string
+          p_reference_id?: string
+          p_reference_type?: string
+          p_source?: string
         }
         Returns: string
       }
@@ -5490,6 +5893,7 @@ export type Database = {
           name: string
         }[]
       }
+      delete_investment_cash_flow: { Args: { p_id: string }; Returns: boolean }
       enqueue_campaign_recipients: {
         Args: { p_batch?: number; p_campaign_id: string }
         Returns: number
@@ -5554,6 +5958,10 @@ export type Database = {
         Args: { p_limit?: number }
         Returns: number
       }
+      reconcile_investment_aggregates: {
+        Args: { p_limit?: number }
+        Returns: number
+      }
       reconcile_user_activity: { Args: { p_days?: number }; Returns: number }
       redeem_voucher: {
         Args: {
@@ -5573,6 +5981,7 @@ export type Database = {
         Args: { p_campaign_id: string }
         Returns: undefined
       }
+      run_roi_auto_attribution: { Args: { p_limit?: number }; Returns: number }
       unread_notification_count: { Args: never; Returns: number }
       verify_activity_log_chain: {
         Args: { p_limit?: number }

@@ -28,6 +28,8 @@ export type NotificationCategory =
   | "feedback_resolved"
   | "feedback_negative"
   | "feedback_aging"
+  | "roi_break_even"
+  | "roi_underperforming"
   | "new_message"
   | "mention"
   | "reminder"

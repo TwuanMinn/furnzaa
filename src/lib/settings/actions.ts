@@ -33,6 +33,8 @@ import {
   scheduleConfigSchema,
   securityConfigSchema,
   trendingConfigSchema,
+  roiConfigSchema,
+  investmentRefSchema,
   type ChangePasswordInput,
   type CompanyInput,
   type DataConfigInput,
@@ -50,6 +52,8 @@ import {
   type RolePermissionsInput,
   type ScheduleConfigInput,
   type TrendingConfigInput,
+  type RoiConfigInput,
+  type InvestmentRefInput,
 } from "./schemas";
 
 /** Settings server actions (Module 11). Every mutation: requirePermission →
@@ -474,6 +478,178 @@ export async function deletePrinterAction(printerId: string): Promise<SettingsRe
       summary: `Removed printer ${p.brand} ${p.model} from the catalog`,
     });
     return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+// ── ROI / Investment configuration ──────────────────────────────────────────
+
+export async function updateRoiConfigAction(input: RoiConfigInput): Promise<SettingsResult> {
+  try {
+    const actor = await requirePermission("settings.edit_roi");
+    const parsed = roiConfigSchema.safeParse(input);
+    if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) };
+    const v = parsed.data;
+
+    const before = await orgBefore("roi_config");
+    const { error } = await updateOrg({
+      roi_config: {
+        target_roi_pct: v.targetRoiPct,
+        default_payback_months: v.defaultPaybackMonths,
+        trailing_window_months: v.trailingWindowMonths,
+        auto_attribution_enabled: v.autoAttributionEnabled,
+      },
+    });
+    if (error) return { ok: false, error };
+    invalidateOrgSettingsCache();
+
+    await logActivity({
+      actor,
+      action: "settings.update_roi",
+      module: "settings",
+      targetType: "organization_settings",
+      targetId: "org",
+      summary: `Updated ROI configuration (target ${v.targetRoiPct}%, payback ${v.defaultPaybackMonths}m, run-rate window ${v.trailingWindowMonths}m${v.autoAttributionEnabled ? ", auto-attribution on" : ""})`,
+      before: before ?? undefined,
+      after: {
+        target_roi_pct: v.targetRoiPct,
+        default_payback_months: v.defaultPaybackMonths,
+        trailing_window_months: v.trailingWindowMonths,
+        auto_attribution_enabled: v.autoAttributionEnabled,
+      },
+    });
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+// Categories & projects are FK-target reference tables (0035) with identical
+// shape, so one set of helpers drives both. Admin-only writes via the service
+// role; soft-delete frees the (partial-unique) name for re-use.
+type RefTable = "investment_categories" | "investment_projects";
+
+async function saveInvestmentRef(
+  table: RefTable,
+  input: InvestmentRefInput,
+  label: string,
+): Promise<SettingsResult<{ id: string }>> {
+  const actor = await requirePermission("settings.edit_roi");
+  const parsed = investmentRefSchema.safeParse(input);
+  if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) };
+  const v = parsed.data;
+
+  const admin = createAdminClient();
+  let id = v.id ?? null;
+  if (id) {
+    const { error } = await admin.from(table).update(dbUpdate(table, { name: v.name, color: v.color })).eq("id", id);
+    if (error) return { ok: false, error: error.code === "23505" ? `That ${label} name already exists.` : error.message };
+  } else {
+    const { data, error } = await admin
+      .from(table)
+      .insert(dbInsert(table, { name: v.name, color: v.color }))
+      .select("id")
+      .single();
+    if (error) return { ok: false, error: error.code === "23505" ? `That ${label} name already exists.` : error.message };
+    id = (data as { id: string }).id;
+  }
+
+  await logActivity({
+    actor,
+    action: v.id ? "settings.roi_ref_update" : "settings.roi_ref_create",
+    module: "settings",
+    targetType: table,
+    targetId: id,
+    summary: `${v.id ? "Updated" : "Added"} ${label} “${v.name}”`,
+  });
+  return { ok: true, data: { id } };
+}
+
+async function setInvestmentRefActive(table: RefTable, id: string, active: boolean, label: string): Promise<SettingsResult> {
+  const actor = await requirePermission("settings.edit_roi");
+  if (!id) return { ok: false, error: `Missing ${label}` };
+  const { data, error } = await createAdminClient()
+    .from(table)
+    .update(dbUpdate(table, { is_active: active }))
+    .eq("id", id)
+    .select("name")
+    .maybeSingle();
+  if (error) return { ok: false, error: error.message };
+  const row = asRow<{ name: string }>(data);
+  if (!row) return { ok: false, error: `${label} not found` };
+  await logActivity({
+    actor,
+    action: active ? "settings.roi_ref_activate" : "settings.roi_ref_deactivate",
+    module: "settings",
+    targetType: table,
+    targetId: id,
+    summary: `${active ? "Activated" : "Deactivated"} ${label} “${row.name}”`,
+  });
+  return { ok: true };
+}
+
+async function deleteInvestmentRef(table: RefTable, id: string, label: string): Promise<SettingsResult> {
+  const actor = await requirePermission("settings.edit_roi");
+  if (!id) return { ok: false, error: `Missing ${label}` };
+  const { data, error } = await createAdminClient()
+    .from(table)
+    .update(dbUpdate(table, { is_active: false, deleted_at: new Date().toISOString() }))
+    .eq("id", id)
+    .select("name")
+    .maybeSingle();
+  if (error) return { ok: false, error: error.message };
+  const row = asRow<{ name: string }>(data);
+  if (!row) return { ok: false, error: `${label} not found` };
+  await logActivity({
+    actor,
+    action: "settings.roi_ref_delete",
+    module: "settings",
+    targetType: table,
+    targetId: id,
+    summary: `Removed ${label} “${row.name}”`,
+  });
+  return { ok: true };
+}
+
+export async function saveInvestmentCategoryAction(input: InvestmentRefInput) {
+  try {
+    return await saveInvestmentRef("investment_categories", input, "category");
+  } catch (e) {
+    return fail(e);
+  }
+}
+export async function setInvestmentCategoryActiveAction(id: string, active: boolean) {
+  try {
+    return await setInvestmentRefActive("investment_categories", id, active, "category");
+  } catch (e) {
+    return fail(e);
+  }
+}
+export async function deleteInvestmentCategoryAction(id: string) {
+  try {
+    return await deleteInvestmentRef("investment_categories", id, "category");
+  } catch (e) {
+    return fail(e);
+  }
+}
+export async function saveInvestmentProjectAction(input: InvestmentRefInput) {
+  try {
+    return await saveInvestmentRef("investment_projects", input, "project");
+  } catch (e) {
+    return fail(e);
+  }
+}
+export async function setInvestmentProjectActiveAction(id: string, active: boolean) {
+  try {
+    return await setInvestmentRefActive("investment_projects", id, active, "project");
+  } catch (e) {
+    return fail(e);
+  }
+}
+export async function deleteInvestmentProjectAction(id: string) {
+  try {
+    return await deleteInvestmentRef("investment_projects", id, "project");
   } catch (e) {
     return fail(e);
   }

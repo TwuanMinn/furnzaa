@@ -5,7 +5,7 @@ import { sendNotification } from "@/lib/notifications/service";
 import { logActivity } from "@/lib/activity/log";
 import { tickCampaigns } from "@/lib/marketing/pipeline";
 import { runAutomationRules } from "@/lib/marketing/automation";
-import { parseFeedbackConfig, parseScheduleConfig } from "@/lib/settings/config";
+import { parseFeedbackConfig, parseRoiConfig, parseScheduleConfig } from "@/lib/settings/config";
 
 /**
  * THE shared cron runner (spec v4). Invoke every minute via any scheduler
@@ -207,6 +207,105 @@ async function runCron() {
   } catch (e) {
     console.error("[cron] feedback aging failed:", e);
     results.feedbackAging = results.feedbackAging ?? 0;
+  }
+
+  // ── 1.8) ROI alerts (break-even / underperforming) + order auto-attribution ─
+  // Stamp-first per state entry so overlapping ticks can't double-notify; the
+  // re-arm clears the stamp when an investment leaves the alerted state.
+  try {
+    await admin
+      .from("investments")
+      .update(dbUpdate("investments", { break_even_notified_at: null }))
+      .neq("break_even_status", "recovered")
+      .not("break_even_notified_at", "is", null);
+    await admin
+      .from("investments")
+      .update(dbUpdate("investments", { underperforming_notified_at: null }))
+      .neq("break_even_status", "underperforming")
+      .not("underperforming_notified_at", "is", null);
+
+    type InvAlert = { id: string; name: string };
+    const { data: recRaw } = await admin
+      .from("investments")
+      .select("id, name")
+      .eq("break_even_status", "recovered")
+      .is("break_even_notified_at", null)
+      .is("deleted_at", null)
+      .limit(100);
+    let roiBreakEven = 0;
+    for (const inv of asRows<InvAlert>(recRaw)) {
+      const { data: stamped } = await admin
+        .from("investments")
+        .update(dbUpdate("investments", { break_even_notified_at: new Date().toISOString() }))
+        .eq("id", inv.id)
+        .is("break_even_notified_at", null)
+        .select("id");
+      if (asRows<{ id: string }>(stamped).length === 0) continue;
+      roiBreakEven += 1;
+      try {
+        await sendNotification({
+          type: "system",
+          category: "roi_break_even",
+          title: `Investment recovered — ${inv.name}`,
+          body: `“${inv.name}” has fully recovered its invested capital. 🎉`,
+          audience: { type: "role", role: "admin" },
+          linkUrl: "/roi",
+        });
+      } catch (e) {
+        console.error("[cron] roi break-even notification failed:", e);
+      }
+    }
+    results.roiBreakEven = roiBreakEven;
+
+    const { data: underRaw } = await admin
+      .from("investments")
+      .select("id, name")
+      .eq("break_even_status", "underperforming")
+      .is("underperforming_notified_at", null)
+      .is("deleted_at", null)
+      .limit(100);
+    let roiUnder = 0;
+    for (const inv of asRows<InvAlert>(underRaw)) {
+      const { data: stamped } = await admin
+        .from("investments")
+        .update(dbUpdate("investments", { underperforming_notified_at: new Date().toISOString() }))
+        .eq("id", inv.id)
+        .is("underperforming_notified_at", null)
+        .select("id");
+      if (asRows<{ id: string }>(stamped).length === 0) continue;
+      roiUnder += 1;
+      try {
+        await sendNotification({
+          type: "system",
+          category: "roi_underperforming",
+          title: `Investment underperforming — ${inv.name}`,
+          body: `“${inv.name}” is not recovering — operating profit is at or below zero. Review the run rate.`,
+          audience: { type: "role", role: "admin" },
+          linkUrl: "/roi",
+        });
+      } catch (e) {
+        console.error("[cron] roi underperforming notification failed:", e);
+      }
+    }
+    results.roiUnderperforming = roiUnder;
+
+    // Order revenue auto-attribution — only when the org toggle is on.
+    const { data: roiCfgRaw } = await admin
+      .from("organization_settings")
+      .select("roi_config")
+      .eq("id", "org")
+      .maybeSingle();
+    const roiCfg = parseRoiConfig(asRow<{ roi_config: unknown }>(roiCfgRaw)?.roi_config);
+    if (roiCfg.auto_attribution_enabled) {
+      const { data: attr, error: attrErr } = await admin.rpc(
+        "run_roi_auto_attribution",
+        rpcParams("run_roi_auto_attribution", { p_limit: 500 }),
+      );
+      if (attrErr) throw new Error(attrErr.message);
+      results.roiAttributed = Number(attr ?? 0);
+    }
+  } catch (e) {
+    console.error("[cron] ROI alerts failed:", e);
   }
 
   // ── 2) Auto-close expired polls ────────────────────────────────────────────

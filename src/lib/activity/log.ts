@@ -24,6 +24,7 @@ export type ActivityModule =
   | "messages"
   | "logs"
   | "analytics"
+  | "roi"
   | "settings";
 
 export type ActivitySeverity = "info" | "warning" | "critical";

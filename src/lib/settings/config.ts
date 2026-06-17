@@ -68,6 +68,13 @@ export interface FeedbackConfig {
   negative_alert_enabled: boolean;
 }
 
+export interface RoiConfig {
+  target_roi_pct: number;
+  default_payback_months: number;
+  trailing_window_months: number;
+  auto_attribution_enabled: boolean;
+}
+
 export interface OrgSettings {
   companyName: string;
   logoUrl: string | null;
@@ -90,6 +97,7 @@ export interface OrgSettings {
   schedule: ScheduleConfig;
   trending: TrendingConfig;
   feedback: FeedbackConfig;
+  roi: RoiConfig;
   passwordPolicy: PasswordPolicy;
   sessionTimeoutMin: number;
   twoFactorRequired: boolean;
@@ -235,6 +243,24 @@ export function parseFeedbackConfig(raw: unknown): FeedbackConfig {
   };
 }
 
+export const DEFAULT_ROI_CONFIG: RoiConfig = {
+  target_roi_pct: 20,
+  default_payback_months: 12,
+  trailing_window_months: 6,
+  auto_attribution_enabled: false,
+};
+
+/** Exported: cron auto-attribution reads roi_config via the admin client. */
+export function parseRoiConfig(raw: unknown): RoiConfig {
+  const o = (raw ?? {}) as Record<string, unknown>;
+  return {
+    target_roi_pct: num(o.target_roi_pct, 20),
+    default_payback_months: Math.max(0, num(o.default_payback_months, 12)),
+    trailing_window_months: Math.max(1, num(o.trailing_window_months, 6)),
+    auto_attribution_enabled: bool(o.auto_attribution_enabled, false),
+  };
+}
+
 function parseVoucherDefaults(raw: unknown): VoucherDefaults {
   const o = (raw ?? {}) as Record<string, unknown>;
   const type = o.type === "percentage" || o.type === "free_shipping" ? o.type : "fixed";
@@ -271,6 +297,7 @@ type OrgRow = {
   schedule_config: unknown;
   trending_config: unknown;
   feedback_config: unknown;
+  roi_config: unknown;
   password_policy: unknown;
   session_timeout_min: number;
   two_factor_required: boolean;
@@ -293,7 +320,7 @@ export async function getOrgSettings(): Promise<OrgSettings> {
        default_tax_rate, order_code_prefix, order_code_format, sku_prefix, sku_format,
        barcode_format, default_warehouse_id, low_stock_alerts_enabled, voucher_defaults,
        customer_score_rules, marketing_config, messaging_config, schedule_config,
-       trending_config, feedback_config, password_policy,
+       trending_config, feedback_config, roi_config, password_policy,
        session_timeout_min, two_factor_required, login_attempt_limit, lockout_minutes,
        log_retention_days, log_purge_archive`,
     )
@@ -323,6 +350,7 @@ export async function getOrgSettings(): Promise<OrgSettings> {
     schedule: parseScheduleConfig(row?.schedule_config),
     trending: parseTrending(row?.trending_config),
     feedback: parseFeedbackConfig(row?.feedback_config),
+    roi: parseRoiConfig(row?.roi_config),
     passwordPolicy: parsePolicy(row?.password_policy),
     sessionTimeoutMin: row?.session_timeout_min ?? 60,
     twoFactorRequired: row?.two_factor_required ?? false,
