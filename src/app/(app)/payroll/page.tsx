@@ -53,6 +53,7 @@ export default async function Page() {
         canRun={user.permissions.has("payroll.run")}
         canApprove={user.permissions.has("payroll.approve")}
         canPay={user.permissions.has("payroll.pay")}
+        canGenerate={user.permissions.has("payslip.generate")}
         canAnalytics={user.permissions.has("payroll.analytics_view")}
       />
     </div>

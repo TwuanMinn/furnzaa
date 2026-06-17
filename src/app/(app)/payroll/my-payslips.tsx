@@ -1,14 +1,18 @@
 "use client";
 
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { ReceiptText, Wallet } from "lucide-react";
+import { Download, Loader2, ReceiptText, Wallet } from "lucide-react";
+import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/states";
 import { formatDate, formatMoney } from "@/lib/format";
+import { getPayslipUrlAction } from "@/lib/payroll/actions";
 import { runStatusMeta } from "@/lib/payroll/formulas";
 import { badgeClass } from "@/lib/badges";
 import type { PayrollItemRow } from "@/lib/payroll/types";
@@ -96,6 +100,9 @@ export function MyPayslips({ currency }: { currency: string }) {
                     <Stat label="Tax" value={formatMoney(r.total_tax_cents, currency)} />
                     <Stat label="Deductions" value={formatMoney(r.total_deductions_cents, currency)} />
                   </div>
+                  <div className="mt-3 flex justify-end">
+                    <DownloadPayslipButton payrollItemId={r.id} />
+                  </div>
                 </CardContent>
               </Card>
             </motion.li>
@@ -112,5 +119,24 @@ function Stat({ label, value }: { label: string; value: string }) {
       <p className="text-xs text-muted-foreground">{label}</p>
       <p className="mt-0.5 font-medium tabular-nums">{value}</p>
     </div>
+  );
+}
+
+function DownloadPayslipButton({ payrollItemId }: { payrollItemId: string }) {
+  const [busy, setBusy] = useState(false);
+  async function download() {
+    setBusy(true);
+    try {
+      const res = await getPayslipUrlAction(payrollItemId);
+      if (res.ok) window.open(res.data.url, "_blank", "noopener,noreferrer");
+      else toast.error(res.error ?? "Payslip not available yet");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Button size="sm" variant="outline" disabled={busy} onClick={() => void download()}>
+      {busy ? <Loader2 className="animate-spin" /> : <Download />} Download PDF
+    </Button>
   );
 }

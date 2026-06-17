@@ -3,11 +3,14 @@
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { asRow, dbInsert, dbUpdate, rpcParams } from "@/lib/supabase/types";
-import { requirePermission } from "@/lib/rbac/guards";
+import { asRow, asRows, dbInsert, dbUpdate, rpcParams } from "@/lib/supabase/types";
+import { requirePermission, requireUser } from "@/lib/rbac/guards";
 import { fail, type ActionResult } from "@/lib/actions/result";
 import { logActivity } from "@/lib/activity/log";
+import { getOrgBranding } from "@/lib/export/branding";
+import { formatMoney } from "@/lib/format";
 import { maskBankAccount } from "./formulas";
+import { renderPayslipPdf, type PayslipLine } from "./payslip-pdf";
 import {
   attendanceSchema,
   employeeSchema,
@@ -393,6 +396,149 @@ export async function closePayrollRunAction(runId: string): Promise<ActionResult
       "payroll.run_close",
       "Closed payroll run",
     );
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+// ── Payslip generation ───────────────────────────────────────────────────────
+
+type ItemLine = { label: string; amount_cents: number };
+type GenItem = {
+  id: string;
+  employee_id: string;
+  pay_basis: string;
+  hours_worked: number;
+  overtime_pay_cents: number;
+  allowances: ItemLine[];
+  deductions: ItemLine[];
+  gross_cents: number;
+  total_deductions_cents: number;
+  total_tax_cents: number;
+  net_cents: number;
+  employer_cost_cents: number;
+  employee: { full_name: string; employee_code: string } | null;
+};
+
+/** Bulk-generate branded PDF payslips for every item in an approved run.
+ *  Idempotent: re-running re-renders and upserts on payroll_item_id. Items are
+ *  written via the service-role client (payslips has no authenticated write). */
+export async function generatePayslipsForRunAction(runId: string): Promise<ActionResult<{ count: number }>> {
+  try {
+    const actor = await requirePermission("payslip.generate");
+    if (!z.string().uuid().safeParse(runId).success) return { ok: false, error: "Invalid run" };
+
+    const admin = createAdminClient();
+    const { data: runData } = await admin.from("payroll_runs").select("id, period_month, status").eq("id", runId).maybeSingle();
+    const run = asRow<{ id: string; period_month: string; status: string }>(runData);
+    if (!run) return { ok: false, error: "Run not found" };
+    if (!["approved", "paid", "closed"].includes(run.status)) {
+      return { ok: false, error: "Approve the run before generating payslips." };
+    }
+
+    const { data: itemsData } = await admin
+      .from("payroll_items")
+      .select(
+        "id, employee_id, pay_basis, hours_worked, overtime_pay_cents, allowances, deductions, gross_cents, total_deductions_cents, total_tax_cents, net_cents, employer_cost_cents, employee:employees!payroll_items_employee_id_fkey(full_name, employee_code)",
+      )
+      .eq("payroll_run_id", runId)
+      .limit(2000);
+    const items = asRows<GenItem>(itemsData);
+    if (items.length === 0) return { ok: false, error: "No items to generate. Calculate the run first." };
+
+    const branding = await getOrgBranding();
+    const currency = branding.currency;
+    const money = (c: number) => formatMoney(c, currency);
+    const periodLabel = new Date(`${run.period_month}T00:00:00`).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    const generatedAt = new Date().toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
+
+    let count = 0;
+    for (const it of items) {
+      const allowances = Array.isArray(it.allowances) ? it.allowances : [];
+      const recurringDeds = Array.isArray(it.deductions) ? it.deductions : [];
+      const allowanceTotal = allowances.reduce((s, a) => s + (Number(a.amount_cents) || 0), 0);
+      const recurringTotal = recurringDeds.reduce((s, d) => s + (Number(d.amount_cents) || 0), 0);
+      const baseCents = Math.max(0, it.gross_cents - it.overtime_pay_cents - allowanceTotal);
+      const absenceCents = Math.max(0, it.total_deductions_cents - recurringTotal - it.total_tax_cents);
+
+      const earnings: PayslipLine[] = [
+        { label: it.pay_basis === "hourly" ? `Base pay (${it.hours_worked}h)` : "Base salary", amount: money(baseCents) },
+        ...(it.overtime_pay_cents > 0 ? [{ label: "Overtime", amount: money(it.overtime_pay_cents) }] : []),
+        ...allowances.map((a) => ({ label: a.label || "Allowance", amount: money(Number(a.amount_cents) || 0) })),
+      ];
+      const deductions: PayslipLine[] = [
+        ...recurringDeds.map((d) => ({ label: d.label || "Deduction", amount: money(Number(d.amount_cents) || 0) })),
+        ...(absenceCents > 0 ? [{ label: "Unpaid leave / absences", amount: money(absenceCents) }] : []),
+        ...(it.total_tax_cents > 0 ? [{ label: "Income tax", amount: money(it.total_tax_cents) }] : []),
+      ];
+
+      const pdf = await renderPayslipPdf({
+        branding,
+        employeeName: it.employee?.full_name ?? "—",
+        employeeCode: it.employee?.employee_code ?? "—",
+        periodLabel,
+        earnings,
+        deductions,
+        grossText: money(it.gross_cents),
+        totalDeductionsText: money(it.total_deductions_cents),
+        netText: money(it.net_cents),
+        employerCostText: money(it.employer_cost_cents),
+        generatedAt,
+      });
+
+      const path = `${it.employee_id}/${it.id}.pdf`;
+      const up = await admin.storage.from("payslips").upload(path, pdf, { contentType: "application/pdf", upsert: true });
+      if (up.error) return { ok: false, error: up.error.message };
+
+      const { error: rowErr } = await admin.from("payslips").upsert(
+        dbInsert("payslips", {
+          payroll_item_id: it.id,
+          employee_id: it.employee_id,
+          period_month: run.period_month,
+          pdf_storage_path: path,
+          status: "generated",
+          created_by: actor.id,
+        }),
+        { onConflict: "payroll_item_id" },
+      );
+      if (rowErr) return { ok: false, error: rowErr.message };
+      count += 1;
+    }
+
+    void logActivity({
+      actor,
+      action: "payroll.payslips_generate",
+      module: "payroll",
+      targetType: "payroll_run",
+      targetId: runId,
+      summary: `Generated ${count} payslip${count === 1 ? "" : "s"} for ${periodLabel}`,
+      severity: "warning",
+    });
+    return { ok: true, data: { count } };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Return a short-lived signed URL for a payslip PDF. RLS on `payslips` scopes
+ *  the lookup: admins see all; staff see only their own (employee.user_id). */
+export async function getPayslipUrlAction(payrollItemId: string): Promise<ActionResult<{ url: string }>> {
+  try {
+    await requireUser();
+    if (!z.string().uuid().safeParse(payrollItemId).success) return { ok: false, error: "Invalid payslip" };
+
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from("payslips")
+      .select("pdf_storage_path")
+      .eq("payroll_item_id", payrollItemId)
+      .maybeSingle();
+    const row = asRow<{ pdf_storage_path: string | null }>(data);
+    if (!row || !row.pdf_storage_path) return { ok: false, error: "Payslip not generated yet" };
+
+    const { data: signed, error } = await createAdminClient().storage.from("payslips").createSignedUrl(row.pdf_storage_path, 300);
+    if (error || !signed) return { ok: false, error: error?.message ?? "Could not create download link" };
+    return { ok: true, data: { url: signed.signedUrl } };
   } catch (e) {
     return fail(e);
   }

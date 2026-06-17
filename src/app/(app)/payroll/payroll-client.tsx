@@ -20,6 +20,7 @@ export function PayrollClient({
   canRun,
   canApprove,
   canPay,
+  canGenerate,
   canAnalytics,
 }: {
   currency: string;
@@ -30,6 +31,7 @@ export function PayrollClient({
   canRun: boolean;
   canApprove: boolean;
   canPay: boolean;
+  canGenerate: boolean;
   canAnalytics: boolean;
 }) {
   const reduce = useReducedMotion();
@@ -87,7 +89,7 @@ export function PayrollClient({
               canManage={canManage}
             />
           ) : (
-            <PayrollRuns currency={currency} canManage={canManage} canRun={canRun} canApprove={canApprove} canPay={canPay} />
+            <PayrollRuns currency={currency} canManage={canManage} canRun={canRun} canApprove={canApprove} canPay={canPay} canGenerate={canGenerate} />
           )}
         </motion.div>
       </AnimatePresence>

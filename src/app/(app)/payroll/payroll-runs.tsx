@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion, useReducedMotion } from "motion/react";
-import { ArrowLeft, CalendarPlus, CheckCircle2, Loader2, Plus, Wallet } from "lucide-react";
+import { ArrowLeft, CalendarPlus, CheckCircle2, FileText, Loader2, Plus, Wallet } from "lucide-react";
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
@@ -27,18 +27,19 @@ import { formatDate, formatMoney, toDateKey } from "@/lib/format";
 import { runStatusMeta } from "@/lib/payroll/formulas";
 import {
   approvePayrollRunAction, calculatePayrollRunAction, closePayrollRunAction,
-  createPayrollRunAction, payPayrollRunAction,
+  createPayrollRunAction, generatePayslipsForRunAction, payPayrollRunAction,
 } from "@/lib/payroll/actions";
 import type { PayrollItemRow, PayrollRunRow } from "@/lib/payroll/types";
 
 export function PayrollRuns({
-  currency, canManage, canRun, canApprove, canPay,
+  currency, canManage, canRun, canApprove, canPay, canGenerate,
 }: {
   currency: string;
   canManage: boolean;
   canRun: boolean;
   canApprove: boolean;
   canPay: boolean;
+  canGenerate: boolean;
 }) {
   const qc = useQueryClient();
   const table = useDataTable<PayrollRunRow>({ endpoint: "/api/payroll/runs", defaultSort: { id: "period_month", dir: "desc" } });
@@ -63,6 +64,7 @@ export function PayrollRuns({
         canApprove={canApprove}
         canPay={canPay}
         canManage={canManage}
+        canGenerate={canGenerate}
         onBack={() => setSelectedId(null)}
         onChanged={refreshAll}
       />
@@ -146,7 +148,7 @@ function RunCreateDialog({ open, onOpenChange, onSaved }: { open: boolean; onOpe
 }
 
 function RunDetail({
-  run, currency, canRun, canApprove, canPay, canManage, onBack, onChanged,
+  run, currency, canRun, canApprove, canPay, canManage, canGenerate, onBack, onChanged,
 }: {
   run: PayrollRunRow;
   currency: string;
@@ -154,6 +156,7 @@ function RunDetail({
   canApprove: boolean;
   canPay: boolean;
   canManage: boolean;
+  canGenerate: boolean;
   onBack: () => void;
   onChanged: () => void;
 }) {
@@ -170,6 +173,15 @@ function RunDetail({
       if (res.ok) { toast.success(ok); items.refresh(); onChanged(); }
       else toast.error(res.error);
     } finally { setBusy(false); setConfirm(null); }
+  }
+
+  async function generate() {
+    setBusy(true);
+    try {
+      const res = await generatePayslipsForRunAction(run.id);
+      if (res.ok) { const n = res.data?.count ?? 0; toast.success(`Generated ${n} payslip${n === 1 ? "" : "s"}`); onChanged(); }
+      else toast.error(res.error);
+    } finally { setBusy(false); }
   }
 
   const columns: DataTableColumn<PayrollItemRow>[] = [
@@ -196,6 +208,9 @@ function RunDetail({
           {run.status === "calculated" && canApprove ? <Button size="sm" disabled={busy} onClick={() => setConfirm("approve")}><CheckCircle2 /> Approve</Button> : null}
           {run.status === "approved" && canPay ? <Button size="sm" disabled={busy} onClick={() => setConfirm("pay")}>Mark paid</Button> : null}
           {run.status === "paid" && canManage ? <Button size="sm" variant="outline" disabled={busy} onClick={() => setConfirm("close")}>Close</Button> : null}
+          {["approved", "paid", "closed"].includes(run.status) && canGenerate ? (
+            <Button size="sm" variant="outline" disabled={busy} onClick={() => void generate()}>{busy ? <Loader2 className="animate-spin" /> : <FileText />} Generate payslips</Button>
+          ) : null}
         </div>
       </div>
 
