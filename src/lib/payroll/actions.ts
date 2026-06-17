@@ -11,6 +11,7 @@ import { getOrgBranding } from "@/lib/export/branding";
 import { formatMoney } from "@/lib/format";
 import { maskBankAccount } from "./formulas";
 import { renderPayslipPdf, type PayslipLine } from "./payslip-pdf";
+import { attendanceDaySchema, attendanceStatusMeta, type AttendanceDayInput } from "./attendance";
 import {
   attendanceSchema,
   employeeSchema,
@@ -256,6 +257,67 @@ export async function saveAttendanceAction(input: AttendanceInput): Promise<Acti
       targetId: v.employeeId,
       summary: `Recorded attendance for ${month}`,
       after: { period_month: month, days_worked: v.daysWorked, overtime_hours: v.overtimeHours },
+    });
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+// ── Daily attendance (one row per employee per day; rolls up to the month) ───
+
+export async function setAttendanceDayAction(input: AttendanceDayInput): Promise<ActionResult<{ id: string }>> {
+  try {
+    const actor = await requirePermission("attendance.manage");
+    const parsed = attendanceDaySchema.safeParse(input);
+    if (!parsed.success) return { ok: false, error: firstErr(parsed.error) };
+    const v = parsed.data;
+
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc(
+      "set_attendance_day",
+      rpcParams("set_attendance_day", {
+        p_employee_id: v.employeeId,
+        p_work_date: v.workDate,
+        p_status: v.status,
+        p_hours: v.hours,
+        p_ot: v.overtime,
+        p_note: v.note || undefined,
+      }),
+    );
+    if (error) return { ok: false, error: error.message };
+
+    void logActivity({
+      actor,
+      action: "payroll.attendance_day_save",
+      module: "payroll",
+      targetType: "employee",
+      targetId: v.employeeId,
+      summary: `Marked ${attendanceStatusMeta(v.status).label.toLowerCase()} on ${v.workDate}`,
+      after: { work_date: v.workDate, status: v.status, hours: v.hours, overtime: v.overtime },
+    });
+    return { ok: true, data: { id: String(data ?? "") } };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function deleteAttendanceDayAction(id: string): Promise<ActionResult> {
+  try {
+    const actor = await requirePermission("attendance.manage");
+    if (!z.string().uuid().safeParse(id).success) return { ok: false, error: "Invalid entry" };
+
+    const supabase = await createClient();
+    const { error } = await supabase.rpc("delete_attendance_day", rpcParams("delete_attendance_day", { p_id: id }));
+    if (error) return { ok: false, error: error.message };
+
+    void logActivity({
+      actor,
+      action: "payroll.attendance_day_clear",
+      module: "payroll",
+      targetType: "attendance_days",
+      targetId: id,
+      summary: "Cleared an attendance day",
     });
     return { ok: true };
   } catch (e) {

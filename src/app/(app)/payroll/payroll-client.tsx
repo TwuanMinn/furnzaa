@@ -2,14 +2,15 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { BarChart3, Users, Wallet } from "lucide-react";
+import { BarChart3, CalendarCheck, Users, Wallet } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { PayrollAnalytics } from "./payroll-analytics";
+import { PayrollAttendance } from "./payroll-attendance";
 import { PayrollEmployees, type Ref } from "./payroll-employees";
 import { PayrollRuns } from "./payroll-runs";
 
-type Tab = "analytics" | "employees" | "runs";
+type Tab = "analytics" | "employees" | "attendance" | "runs";
 
 export function PayrollClient({
   currency,
@@ -21,6 +22,7 @@ export function PayrollClient({
   canApprove,
   canPay,
   canGenerate,
+  canAttendance,
   canAnalytics,
 }: {
   currency: string;
@@ -32,12 +34,14 @@ export function PayrollClient({
   canApprove: boolean;
   canPay: boolean;
   canGenerate: boolean;
+  canAttendance: boolean;
   canAnalytics: boolean;
 }) {
   const reduce = useReducedMotion();
   const tabs: { key: Tab; label: string; icon: typeof Users }[] = [
     ...(canAnalytics ? [{ key: "analytics" as const, label: "Analytics", icon: BarChart3 }] : []),
     { key: "employees", label: "Employees", icon: Users },
+    { key: "attendance", label: "Attendance", icon: CalendarCheck },
     { key: "runs", label: "Payroll runs", icon: Wallet },
   ];
   const [tab, setTab] = useState<Tab>(canAnalytics ? "analytics" : "employees");
@@ -88,6 +92,8 @@ export function PayrollClient({
               employerProfiles={employerProfiles}
               canManage={canManage}
             />
+          ) : tab === "attendance" ? (
+            <PayrollAttendance canManage={canAttendance} />
           ) : (
             <PayrollRuns currency={currency} canManage={canManage} canRun={canRun} canApprove={canApprove} canPay={canPay} canGenerate={canGenerate} />
           )}

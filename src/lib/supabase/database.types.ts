@@ -1050,6 +1050,73 @@ export type Database = {
         }
         Relationships: []
       }
+      attendance_days: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          employee_id: string
+          hours_worked: number
+          id: string
+          note: string | null
+          overtime_hours: number
+          source: string
+          status: string
+          updated_at: string
+          updated_by: string | null
+          work_date: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          employee_id: string
+          hours_worked?: number
+          id?: string
+          note?: string | null
+          overtime_hours?: number
+          source?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          work_date: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string
+          hours_worked?: number
+          id?: string
+          note?: string | null
+          overtime_hours?: number
+          source?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          work_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_days_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_days_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_days_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       attendance_records: {
         Row: {
           absences: number
@@ -6568,6 +6635,7 @@ export type Database = {
           name: string
         }[]
       }
+      delete_attendance_day: { Args: { p_id: string }; Returns: boolean }
       delete_investment_cash_flow: { Args: { p_id: string }; Returns: boolean }
       enqueue_campaign_recipients: {
         Args: { p_batch?: number; p_campaign_id: string }
@@ -6616,6 +6684,10 @@ export type Database = {
       }
       next_document_number: { Args: { p_prefix: string }; Returns: string }
       next_order_code: { Args: { p_prefix?: string }; Returns: string }
+      payroll_recompute_attendance_month: {
+        Args: { p_employee_id: string; p_month: string }
+        Returns: undefined
+      }
       poll_results: {
         Args: { p_poll_id: string }
         Returns: {
@@ -6657,6 +6729,17 @@ export type Database = {
         Returns: undefined
       }
       run_roi_auto_attribution: { Args: { p_limit?: number }; Returns: number }
+      set_attendance_day: {
+        Args: {
+          p_employee_id: string
+          p_hours?: number
+          p_note?: string
+          p_ot?: number
+          p_status: string
+          p_work_date: string
+        }
+        Returns: string
+      }
       unread_notification_count: { Args: never; Returns: number }
       verify_activity_log_chain: {
         Args: { p_limit?: number }
