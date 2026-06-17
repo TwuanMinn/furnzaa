@@ -28,6 +28,20 @@ const TONE_BADGE: Record<Tone, string> = {
   loss: "bg-red-500/10 text-red-700 ring-red-500/25 dark:text-red-400",
   muted: "bg-muted text-muted-foreground ring-border",
 };
+/** Tone-colored hairline accent across the top edge of a card. */
+const TONE_ACCENT: Record<Tone, string> = {
+  ok: "from-emerald-500/70",
+  low: "from-amber-500/70",
+  loss: "from-red-500/70",
+  muted: "from-primary/40",
+};
+/** Soft radial glow that fades in behind the card icon on hover. */
+const TONE_GLOW: Record<Tone, string> = {
+  ok: "bg-emerald-500/25",
+  low: "bg-amber-500/25",
+  loss: "bg-red-500/25",
+  muted: "bg-primary/15",
+};
 
 /** Ease-out count-up; animates from the previous value to the new target.
  *  Reduced motion → returns the target directly (no animation, no setState). */
@@ -81,15 +95,19 @@ function KpiCard({
   const n = useCountUp(value);
   return (
     <motion.div
-      initial={reduce ? false : { opacity: 0, y: 10 }}
+      initial={reduce ? false : { opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: "easeOut", delay: reduce ? 0 : index * 0.06 }}
+      whileHover={reduce ? undefined : { y: -3 }}
+      transition={{ type: "spring", stiffness: 260, damping: 22, delay: reduce ? 0 : index * 0.06 }}
     >
-      <Card className="overflow-hidden">
-        <CardContent className="space-y-2 p-5">
+      <Card className="group relative overflow-hidden transition-shadow duration-300 hover:shadow-lg hover:shadow-black/[0.06] dark:hover:shadow-black/30">
+        {/* tone accent + hover glow */}
+        <span aria-hidden className={cn("absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r to-transparent opacity-80", TONE_ACCENT[tone])} />
+        <span aria-hidden className={cn("pointer-events-none absolute -right-8 -top-8 size-24 rounded-full opacity-0 blur-2xl transition-opacity duration-500 group-hover:opacity-100", TONE_GLOW[tone])} />
+        <CardContent className="relative space-y-2 p-5">
           <div className="flex items-center justify-between gap-2">
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-            <span className={cn("inline-flex size-7 shrink-0 items-center justify-center rounded-lg", TONE_CHIP[tone])}>
+            <span className={cn("inline-flex size-7 shrink-0 items-center justify-center rounded-lg transition-transform duration-300 group-hover:scale-110", TONE_CHIP[tone])}>
               <Icon className="size-4" aria-hidden />
             </span>
           </div>
@@ -97,10 +115,10 @@ function KpiCard({
           {progress != null ? (
             <div className="h-1.5 overflow-hidden rounded-full bg-muted">
               <motion.div
-                className="h-full rounded-full bg-emerald-500 dark:bg-emerald-400"
+                className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 dark:from-emerald-400 dark:to-emerald-300"
                 initial={reduce ? false : { width: 0 }}
                 animate={{ width: `${Math.max(0, Math.min(100, progress))}%` }}
-                transition={{ duration: 0.6, ease: "easeOut", delay: reduce ? 0 : 0.25 }}
+                transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: reduce ? 0 : 0.25 }}
               />
             </div>
           ) : null}
@@ -184,15 +202,18 @@ export function RoiSummary({ data, currency }: { data: RoiData; currency: string
         />
         {/* Break-even status — badge, no count-up */}
         <motion.div
-          initial={reduce ? false : { opacity: 0, y: 10 }}
+          initial={reduce ? false : { opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, ease: "easeOut", delay: reduce ? 0 : 5 * 0.06 }}
+          whileHover={reduce ? undefined : { y: -3 }}
+          transition={{ type: "spring", stiffness: 260, damping: 22, delay: reduce ? 0 : 5 * 0.06 }}
         >
-          <Card className="overflow-hidden">
-            <CardContent className="space-y-2 p-5">
+          <Card className="group relative overflow-hidden transition-shadow duration-300 hover:shadow-lg hover:shadow-black/[0.06] dark:hover:shadow-black/30">
+            <span aria-hidden className={cn("absolute inset-x-0 top-0 h-0.5 bg-gradient-to-r to-transparent opacity-80", TONE_ACCENT[meta.tone])} />
+            <span aria-hidden className={cn("pointer-events-none absolute -right-8 -top-8 size-24 rounded-full opacity-0 blur-2xl transition-opacity duration-500 group-hover:opacity-100", TONE_GLOW[meta.tone])} />
+            <CardContent className="relative space-y-2 p-5">
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Break-even status</p>
-                <span className={cn("inline-flex size-7 shrink-0 items-center justify-center rounded-lg", TONE_CHIP[meta.tone])}>
+                <span className={cn("inline-flex size-7 shrink-0 items-center justify-center rounded-lg transition-transform duration-300 group-hover:scale-110", TONE_CHIP[meta.tone])}>
                   <Trophy className="size-4" aria-hidden />
                 </span>
               </div>

@@ -246,7 +246,7 @@ function BreakdownCard({
 }) {
   const reduce = useReducedMotion();
   return (
-    <Card>
+    <Card className="transition-shadow duration-300 hover:shadow-md hover:shadow-black/[0.04] dark:hover:shadow-black/20">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-1.5 text-base">
           <Icon className="size-4 text-muted-foreground" aria-hidden /> {title}
@@ -257,17 +257,17 @@ function BreakdownCard({
           <p className="py-6 text-center text-sm text-muted-foreground">No investments yet.</p>
         ) : (
           rows.map((r, i) => (
-            <div key={r.id ?? "none"} className="space-y-1">
+            <div key={r.id ?? "none"} className="-mx-2 space-y-1 rounded-md px-2 py-1 transition-colors hover:bg-muted/50">
               <div className="flex items-baseline justify-between gap-2 text-sm">
                 <span className="truncate font-medium">{r.name}</span>
                 <span className={cn("shrink-0 tabular-nums", TONE_TEXT[signTone(r.roiPct)])}>{pct(r.roiPct)} ROI</span>
               </div>
               <div className="h-2 overflow-hidden rounded-full bg-muted">
                 <motion.div
-                  className="h-full rounded-full bg-emerald-500 dark:bg-emerald-400"
+                  className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-400 dark:from-emerald-400 dark:to-emerald-300"
                   initial={reduce ? false : { width: 0 }}
                   animate={{ width: `${Math.max(0, Math.min(100, r.recoveryPct))}%` }}
-                  transition={{ duration: 0.5, ease: "easeOut", delay: reduce ? 0 : i * 0.05 }}
+                  transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1], delay: reduce ? 0 : 0.1 + i * 0.06 }}
                 />
               </div>
               <div className="flex items-baseline justify-between gap-2 text-xs text-muted-foreground tabular-nums">

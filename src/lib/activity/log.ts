@@ -25,6 +25,7 @@ export type ActivityModule =
   | "logs"
   | "analytics"
   | "roi"
+  | "payroll"
   | "settings";
 
 export type ActivitySeverity = "info" | "warning" | "critical";
