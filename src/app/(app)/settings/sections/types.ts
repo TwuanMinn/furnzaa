@@ -18,6 +18,7 @@ export type SectionId =
   | "trending"
   | "feedback"
   | "roi"
+  | "payroll"
   | "messaging"
   | "inventory"
   | "loyalty"
@@ -101,6 +102,20 @@ export interface RoiConfigData {
   projects: { id: string; name: string; color: string; isActive: boolean }[];
 }
 
+export interface PayrollHrData {
+  currency: string;
+  departments: { id: string; name: string; color: string; isActive: boolean }[];
+  taxProfiles: {
+    id: string;
+    name: string;
+    kind: "none" | "flat" | "fixed";
+    ratePercent: number;
+    fixedAmount: number;
+    isActive: boolean;
+  }[];
+  employerProfiles: { id: string; name: string; ratePercent: number; isActive: boolean }[];
+}
+
 export interface MessagingData {
   reactionEmojis: string[];
   inviteExpiryHours: number;
@@ -164,6 +179,7 @@ export interface SettingsBundle {
   trending?: { data: TrendingConfigData; canEdit: boolean };
   feedback?: { data: FeedbackConfigData; canEdit: boolean };
   roi?: { data: RoiConfigData; canEdit: boolean };
+  payroll?: { data: PayrollHrData; canEdit: boolean };
   messaging?: { data: MessagingData; canEdit: boolean };
   inventory?: { data: InventoryData; canEdit: boolean };
   loyalty?: { data: LoyaltyData; canEdit: boolean };

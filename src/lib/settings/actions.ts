@@ -35,6 +35,9 @@ import {
   trendingConfigSchema,
   roiConfigSchema,
   investmentRefSchema,
+  departmentRefSchema,
+  taxProfileSchema,
+  employerProfileSchema,
   type ChangePasswordInput,
   type CompanyInput,
   type DataConfigInput,
@@ -54,6 +57,9 @@ import {
   type TrendingConfigInput,
   type RoiConfigInput,
   type InvestmentRefInput,
+  type DepartmentRefInput,
+  type TaxProfileInput,
+  type EmployerProfileInput,
 } from "./schemas";
 
 /** Settings server actions (Module 11). Every mutation: requirePermission →
@@ -1099,6 +1105,160 @@ export async function updateRolePermissionsAction(
       before: { keys: beforeKeys },
       after: { keys: permRows.map((p) => p.key).sort() },
     });
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+// ── Payroll / HR configuration (settings.edit_payroll) ────────────────────────
+
+/** Departments — shared by User Management + Payroll analytics. name + color. */
+export async function savePayrollDepartmentAction(
+  input: DepartmentRefInput,
+): Promise<SettingsResult<{ id: string }>> {
+  try {
+    const actor = await requirePermission("settings.edit_payroll");
+    const parsed = departmentRefSchema.safeParse(input);
+    if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) };
+    const v = parsed.data;
+    const admin = createAdminClient();
+    let id = v.id ?? null;
+    if (id) {
+      const { error } = await admin.from("departments").update(dbUpdate("departments", { name: v.name, color: v.color })).eq("id", id);
+      if (error) return { ok: false, error: error.code === "23505" ? "That department name already exists." : error.message };
+    } else {
+      const { data, error } = await admin.from("departments").insert(dbInsert("departments", { name: v.name, color: v.color })).select("id").single();
+      if (error) return { ok: false, error: error.code === "23505" ? "That department name already exists." : error.message };
+      id = (data as { id: string }).id;
+    }
+    await logActivity({
+      actor,
+      action: v.id ? "settings.payroll_dept_update" : "settings.payroll_dept_create",
+      module: "settings",
+      targetType: "departments",
+      targetId: id,
+      summary: `${v.id ? "Updated" : "Added"} department “${v.name}”`,
+    });
+    return { ok: true, data: { id } };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function setPayrollDepartmentActiveAction(id: string, active: boolean): Promise<SettingsResult> {
+  try {
+    const actor = await requirePermission("settings.edit_payroll");
+    if (!id) return { ok: false, error: "Missing department" };
+    const { data, error } = await createAdminClient()
+      .from("departments").update(dbUpdate("departments", { is_active: active })).eq("id", id).select("name").maybeSingle();
+    if (error) return { ok: false, error: error.message };
+    const row = asRow<{ name: string }>(data);
+    if (!row) return { ok: false, error: "Department not found" };
+    await logActivity({ actor, action: active ? "settings.payroll_dept_activate" : "settings.payroll_dept_deactivate", module: "settings", targetType: "departments", targetId: id, summary: `${active ? "Activated" : "Deactivated"} department “${row.name}”` });
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function deletePayrollDepartmentAction(id: string): Promise<SettingsResult> {
+  try {
+    const actor = await requirePermission("settings.edit_payroll");
+    if (!id) return { ok: false, error: "Missing department" };
+    const { data, error } = await createAdminClient()
+      .from("departments").update(dbUpdate("departments", { is_active: false, deleted_at: new Date().toISOString() })).eq("id", id).select("name").maybeSingle();
+    if (error) return { ok: false, error: error.message };
+    const row = asRow<{ name: string }>(data);
+    if (!row) return { ok: false, error: "Department not found" };
+    await logActivity({ actor, action: "settings.payroll_dept_delete", module: "settings", targetType: "departments", targetId: id, summary: `Removed department “${row.name}”` });
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Tax profiles — none | flat % of taxable base | fixed amount (cents). */
+export async function saveTaxProfileAction(input: TaxProfileInput): Promise<SettingsResult<{ id: string }>> {
+  try {
+    const actor = await requirePermission("settings.edit_payroll");
+    const parsed = taxProfileSchema.safeParse(input);
+    if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) };
+    const v = parsed.data;
+    const payload = {
+      name: v.name,
+      kind: v.kind,
+      rate_percent: v.kind === "flat" ? v.ratePercent : 0,
+      fixed_cents: v.kind === "fixed" ? Math.round(v.fixedAmount * 100) : 0,
+    };
+    const admin = createAdminClient();
+    let id = v.id ?? null;
+    if (id) {
+      const { error } = await admin.from("tax_profiles").update(dbUpdate("tax_profiles", payload)).eq("id", id);
+      if (error) return { ok: false, error: error.message };
+    } else {
+      const { data, error } = await admin.from("tax_profiles").insert(dbInsert("tax_profiles", payload)).select("id").single();
+      if (error) return { ok: false, error: error.message };
+      id = (data as { id: string }).id;
+    }
+    await logActivity({ actor, action: v.id ? "settings.tax_profile_update" : "settings.tax_profile_create", module: "settings", targetType: "tax_profiles", targetId: id, summary: `${v.id ? "Updated" : "Added"} tax profile “${v.name}” (${v.kind})` });
+    return { ok: true, data: { id } };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function deleteTaxProfileAction(id: string): Promise<SettingsResult> {
+  try {
+    const actor = await requirePermission("settings.edit_payroll");
+    if (!id) return { ok: false, error: "Missing tax profile" };
+    const { data, error } = await createAdminClient()
+      .from("tax_profiles").update(dbUpdate("tax_profiles", { is_active: false, deleted_at: new Date().toISOString() })).eq("id", id).select("name").maybeSingle();
+    if (error) return { ok: false, error: error.message };
+    const row = asRow<{ name: string }>(data);
+    if (!row) return { ok: false, error: "Tax profile not found" };
+    await logActivity({ actor, action: "settings.tax_profile_delete", module: "settings", targetType: "tax_profiles", targetId: id, summary: `Removed tax profile “${row.name}”` });
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Employer-side contribution profiles — flat % of gross. */
+export async function saveEmployerProfileAction(input: EmployerProfileInput): Promise<SettingsResult<{ id: string }>> {
+  try {
+    const actor = await requirePermission("settings.edit_payroll");
+    const parsed = employerProfileSchema.safeParse(input);
+    if (!parsed.success) return { ok: false, error: firstIssue(parsed.error) };
+    const v = parsed.data;
+    const payload = { name: v.name, rate_percent: v.ratePercent };
+    const admin = createAdminClient();
+    let id = v.id ?? null;
+    if (id) {
+      const { error } = await admin.from("employer_contribution_profiles").update(dbUpdate("employer_contribution_profiles", payload)).eq("id", id);
+      if (error) return { ok: false, error: error.message };
+    } else {
+      const { data, error } = await admin.from("employer_contribution_profiles").insert(dbInsert("employer_contribution_profiles", payload)).select("id").single();
+      if (error) return { ok: false, error: error.message };
+      id = (data as { id: string }).id;
+    }
+    await logActivity({ actor, action: v.id ? "settings.employer_profile_update" : "settings.employer_profile_create", module: "settings", targetType: "employer_contribution_profiles", targetId: id, summary: `${v.id ? "Updated" : "Added"} employer contribution “${v.name}” (${v.ratePercent}%)` });
+    return { ok: true, data: { id } };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function deleteEmployerProfileAction(id: string): Promise<SettingsResult> {
+  try {
+    const actor = await requirePermission("settings.edit_payroll");
+    if (!id) return { ok: false, error: "Missing profile" };
+    const { data, error } = await createAdminClient()
+      .from("employer_contribution_profiles").update(dbUpdate("employer_contribution_profiles", { is_active: false, deleted_at: new Date().toISOString() })).eq("id", id).select("name").maybeSingle();
+    if (error) return { ok: false, error: error.message };
+    const row = asRow<{ name: string }>(data);
+    if (!row) return { ok: false, error: "Profile not found" };
+    await logActivity({ actor, action: "settings.employer_profile_delete", module: "settings", targetType: "employer_contribution_profiles", targetId: id, summary: `Removed employer contribution “${row.name}”` });
     return { ok: true };
   } catch (e) {
     return fail(e);
