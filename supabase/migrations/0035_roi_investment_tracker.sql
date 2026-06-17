@@ -131,7 +131,9 @@ create index idx_investments_roi       on public.investments (roi_pct, id)      
 create index idx_investments_recovery  on public.investments (recovery_pct, id)   where deleted_at is null;
 create index idx_investments_capital   on public.investments (total_capital_cents, id) where deleted_at is null;
 create index idx_investments_name      on public.investments (name, id)           where deleted_at is null;
-create index idx_investments_name_trgm on public.investments using gin (name gin_trgm_ops);
+-- Schema-qualify the trgm operator class: Supabase keeps pg_trgm in the
+-- `extensions` schema, which isn't on the migration runner's search_path.
+create index idx_investments_name_trgm on public.investments using gin (name extensions.gin_trgm_ops);
 create index idx_investments_category  on public.investments (category_id);
 create index idx_investments_project   on public.investments (project_id);
 create index idx_investments_created_by on public.investments (created_by);
