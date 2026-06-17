@@ -10,6 +10,8 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
+  Line,
+  LineChart,
   ResponsiveContainer,
   Tooltip as ChartTooltip,
   XAxis,
@@ -26,6 +28,7 @@ import type { PayrollData } from "@/lib/payroll/types";
 
 const EMPLOYER = "#6366f1"; // indigo
 const NET = "#10b981"; // emerald
+const OVERTIME = "#f59e0b"; // amber
 const BAR_HEX: Record<string, string> = {
   slate: "#64748b", blue: "#3b82f6", indigo: "#6366f1", green: "#22c55e", amber: "#f59e0b", red: "#ef4444", violet: "#8b5cf6",
 };
@@ -174,6 +177,20 @@ export function PayrollAnalytics({ currency }: { currency: string }) {
               </div>
             </ChartCard>
           </div>
+
+          <ChartCard title="Overtime cost trend" subtitle="Total overtime pay per month." index={3}>
+            <div className="h-60">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={series} margin={{ top: 8, right: 12, bottom: 0, left: 4 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="currentColor" opacity={0.1} />
+                  <XAxis dataKey="month" tick={{ fontSize: 11 }} tickFormatter={monthTick} stroke="currentColor" opacity={0.5} />
+                  <YAxis tick={{ fontSize: 11 }} stroke="currentColor" opacity={0.5} width={70} />
+                  <ChartTooltip formatter={(v: number | string) => [moneyTip(v), "Overtime"]} labelFormatter={(l: string) => formatDate(l, "MMMM yyyy")} contentStyle={TOOLTIP_STYLE} />
+                  <Line type="monotone" dataKey="ot" stroke={OVERTIME} strokeWidth={2.25} dot={{ r: 2.5, fill: OVERTIME }} isAnimationActive={!reduce} animationEasing="ease-out" animationDuration={800} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </ChartCard>
         </>
       )}
     </div>

@@ -106,6 +106,18 @@ export const GET = withAuth(async (req, { user }) => {
       roiCount = Number((roiRes as { underperforming_count: number } | null)?.underperforming_count ?? 0);
     }
 
+    // 7. Payroll runs awaiting action (Draft + Calculated) — the amber badge.
+    //    Admin/payroll-staff only; payroll_runs holds few rows so this exact
+    //    count rides idx_payroll_runs_status. Staff (view_own) see no runs.
+    let payrollCount = 0;
+    if (user.permissions.has("payroll.view_all")) {
+      const { count } = await createAdminClient()
+        .from("payroll_runs")
+        .select("id", { count: "exact", head: true })
+        .in("status", ["draft", "calculated"]);
+      payrollCount = count ?? 0;
+    }
+
     return jsonOk({
       orders: ordersCount ?? 0,
       lowStock: lowStockCount,
@@ -113,6 +125,7 @@ export const GET = withAuth(async (req, { user }) => {
       feedback: feedbackCount,
       messages: messagesCount,
       roi: roiCount,
+      payroll: payrollCount,
     });
   } catch (e) {
     return jsonError(e instanceof Error ? e.message : "Failed to load sidebar counts", 500);

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Coins, Loader2, Pencil, Plus, Users } from "lucide-react";
+import { Coins, Loader2, Pencil, Plus, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
@@ -10,6 +10,7 @@ import { badgeClass } from "@/lib/badges";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -226,6 +227,8 @@ function SalaryDialog({
   const [erId, setErId] = useState("");
   const [days, setDays] = useState("22");
   const [effectiveFrom, setEffectiveFrom] = useState(toDateKey(0));
+  const [allowances, setAllowances] = useState<{ label: string; amount: string; taxable: boolean }[]>([]);
+  const [deductions, setDeductions] = useState<{ label: string; amount: string; preTax: boolean }[]>([]);
   const [busy, setBusy] = useState(false);
 
   async function save() {
@@ -235,18 +238,26 @@ function SalaryDialog({
       const res = await addSalaryStructureAction({
         employeeId: employee.id, effectiveFrom, payBasis,
         baseSalary: Number(base) || 0, hourlyRate: Number(hourly) || 0, overtimeRate: Number(otRate) || 0,
-        recurringAllowances: [], recurringDeductions: [],
+        recurringAllowances: allowances
+          .filter((a) => a.label.trim())
+          .map((a) => ({ label: a.label.trim(), amount: Number(a.amount) || 0, taxable: a.taxable })),
+        recurringDeductions: deductions
+          .filter((d) => d.label.trim())
+          .map((d) => ({ label: d.label.trim(), amount: Number(d.amount) || 0, preTax: d.preTax })),
         taxProfileId: taxId || null, employerContributionProfileId: erId || null,
         standardWorkingDays: Number(days) || 22,
       });
-      if (res.ok) { toast.success("Salary structure saved"); onOpenChange(false); onSaved(); }
-      else toast.error(res.error);
+      if (res.ok) {
+        toast.success("Salary structure saved");
+        setAllowances([]); setDeductions([]);
+        onOpenChange(false); onSaved();
+      } else toast.error(res.error);
     } finally { setBusy(false); }
   }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[88vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Set salary{employee ? ` — ${employee.full_name}` : ""}</DialogTitle>
           <DialogDescription>Creates a new effective-dated salary structure (old ones are kept as history). Amounts in {currency}.</DialogDescription>
@@ -283,6 +294,50 @@ function SalaryDialog({
           {payBasis === "salaried" ? (
             <div className="space-y-1.5"><Label htmlFor="sal-days">Standard working days / month</Label><Input id="sal-days" type="number" min={1} max={31} value={days} onChange={(e) => setDays(e.target.value)} /></div>
           ) : null}
+
+          {/* Recurring allowances (taxable flag) */}
+          <div className="space-y-2 sm:col-span-2">
+            <div className="flex items-center justify-between">
+              <Label>Recurring allowances</Label>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setAllowances((p) => [...p, { label: "", amount: "", taxable: true }])}>
+                <Plus className="size-3.5" /> Add
+              </Button>
+            </div>
+            {allowances.length === 0 ? (
+              <p className="text-xs text-muted-foreground">None. Add monthly allowances (housing, transport…).</p>
+            ) : (
+              allowances.map((a, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <Input value={a.label} placeholder="Label" maxLength={80} className="h-8 flex-1" aria-label={`Allowance ${i + 1} label`} onChange={(e) => setAllowances((p) => p.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))} />
+                  <Input value={a.amount} type="number" min={0} placeholder="0" className="h-8 w-28 tabular-nums" aria-label={`Allowance ${i + 1} amount`} onChange={(e) => setAllowances((p) => p.map((x, j) => (j === i ? { ...x, amount: e.target.value } : x)))} />
+                  <label className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground"><Checkbox checked={a.taxable} onCheckedChange={(v) => setAllowances((p) => p.map((x, j) => (j === i ? { ...x, taxable: v === true } : x)))} /> Taxable</label>
+                  <Button type="button" variant="ghost" size="icon-sm" aria-label={`Remove allowance ${i + 1}`} onClick={() => setAllowances((p) => p.filter((_, j) => j !== i))}><Trash2 className="size-4 text-muted-foreground" /></Button>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* Recurring deductions (pre-tax flag) */}
+          <div className="space-y-2 sm:col-span-2">
+            <div className="flex items-center justify-between">
+              <Label>Recurring deductions</Label>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setDeductions((p) => [...p, { label: "", amount: "", preTax: false }])}>
+                <Plus className="size-3.5" /> Add
+              </Button>
+            </div>
+            {deductions.length === 0 ? (
+              <p className="text-xs text-muted-foreground">None. Add recurring deductions (insurance, union…).</p>
+            ) : (
+              deductions.map((d, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <Input value={d.label} placeholder="Label" maxLength={80} className="h-8 flex-1" aria-label={`Deduction ${i + 1} label`} onChange={(e) => setDeductions((p) => p.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))} />
+                  <Input value={d.amount} type="number" min={0} placeholder="0" className="h-8 w-28 tabular-nums" aria-label={`Deduction ${i + 1} amount`} onChange={(e) => setDeductions((p) => p.map((x, j) => (j === i ? { ...x, amount: e.target.value } : x)))} />
+                  <label className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground"><Checkbox checked={d.preTax} onCheckedChange={(v) => setDeductions((p) => p.map((x, j) => (j === i ? { ...x, preTax: v === true } : x)))} /> Pre-tax</label>
+                  <Button type="button" variant="ghost" size="icon-sm" aria-label={`Remove deduction ${i + 1}`} onClick={() => setDeductions((p) => p.filter((_, j) => j !== i))}><Trash2 className="size-4 text-muted-foreground" /></Button>
+                </div>
+              ))
+            )}
+          </div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>
