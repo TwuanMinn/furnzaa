@@ -47,7 +47,7 @@ export const GET = withPermission("payroll.view_all", async (_req, ctx) => {
   }>(empData);
   if (!emp) return jsonError("Employee not found", 404, "not_found");
 
-  const [structRes, attRes, itemRes] = await Promise.all([
+  const [structRes, attRes, dayRes, itemRes] = await Promise.all([
     supabase
       .from("salary_structures")
       .select(
@@ -64,6 +64,12 @@ export const GET = withPermission("payroll.view_all", async (_req, ctx) => {
       .eq("employee_id", id)
       .order("period_month", { ascending: false })
       .limit(24),
+    supabase
+      .from("attendance_days")
+      .select("id, work_date, status, hours_worked, overtime_hours, note")
+      .eq("employee_id", id)
+      .order("work_date", { ascending: false })
+      .limit(40),
     supabase
       .from("payroll_items")
       .select(
@@ -110,6 +116,21 @@ export const GET = withPermission("payroll.view_all", async (_req, ctx) => {
     },
     salaryStructures: asRows<SalaryStructureHistoryRow>(structRes.data),
     attendance: asRows<AttendanceHistoryRow>(attRes.data),
+    attendanceDays: asRows<{
+      id: string;
+      work_date: string;
+      status: string;
+      hours_worked: number;
+      overtime_hours: number;
+      note: string | null;
+    }>(dayRes.data).map((d) => ({
+      id: d.id,
+      work_date: d.work_date,
+      status: d.status,
+      hours_worked: Number(d.hours_worked),
+      overtime_hours: Number(d.overtime_hours),
+      note: d.note,
+    })),
     payItems,
   };
   return jsonOk(data);

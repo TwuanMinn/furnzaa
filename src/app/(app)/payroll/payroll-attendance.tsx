@@ -22,7 +22,7 @@ import {
   type AttendanceDayCell, type AttendanceRangeData, type AttendanceStatus,
 } from "@/lib/payroll/attendance";
 
-type Mode = "day" | "week" | "month";
+type Mode = "day" | "week" | "month" | "year";
 
 // ── Local date helpers (no UTC drift — build keys from local Y/M/D) ───────────
 const pad = (n: number) => String(n).padStart(2, "0");
@@ -57,9 +57,11 @@ export function PayrollAttendance({ canManage }: { canManage: boolean }) {
   const [anchor, setAnchor] = useState<Date>(() => new Date(2026, 5, 15)); // seeded demo month
   const [editing, setEditing] = useState<EditState>(null);
 
-  const keys = useMemo(() => rangeKeys(mode, anchor), [mode, anchor]);
-  const from = keys[0] ?? toKey(anchor);
-  const to = keys[keys.length - 1] ?? from;
+  const isYear = mode === "year";
+  const year = anchor.getFullYear();
+  const keys = useMemo(() => (isYear ? [] : rangeKeys(mode, anchor)), [isYear, mode, anchor]);
+  const from = isYear ? `${year}-01-01` : (keys[0] ?? toKey(anchor));
+  const to = isYear ? `${year}-12-31` : (keys[keys.length - 1] ?? from);
 
   const q = useQuery({
     queryKey: ["payroll-attendance", from, to],
@@ -78,12 +80,33 @@ export function PayrollAttendance({ canManage }: { canManage: boolean }) {
     return m;
   }, [q.data]);
 
+  // Year view: per-employee, per-month tallies (worked / absent / leave).
+  const yearAgg = useMemo(() => {
+    const m = new Map<string, { worked: number; absent: number; leave: number }[]>();
+    for (const c of q.data?.days ?? []) {
+      let arr = m.get(c.employee_id);
+      if (!arr) { arr = Array.from({ length: 12 }, () => ({ worked: 0, absent: 0, leave: 0 })); m.set(c.employee_id, arr); }
+      const cell = arr[Number(c.work_date.slice(5, 7)) - 1];
+      if (!cell) continue;
+      if (c.status === "present" || c.status === "remote") cell.worked += 1;
+      else if (c.status === "half_day") cell.worked += 0.5;
+      else if (c.status === "absent") cell.absent += 1;
+      else if (c.status === "leave_paid" || c.status === "leave_unpaid") cell.leave += 1;
+    }
+    return m;
+  }, [q.data]);
+
   function shift(dir: -1 | 1) {
     const a = new Date(anchor);
     if (mode === "day") a.setDate(a.getDate() + dir);
     else if (mode === "week") a.setDate(a.getDate() + 7 * dir);
+    else if (mode === "year") a.setFullYear(a.getFullYear() + dir);
     else a.setMonth(a.getMonth() + dir);
     setAnchor(a);
+  }
+  function drillToMonth(monthIdx: number) {
+    setAnchor(new Date(year, monthIdx, 1));
+    setMode("month");
   }
   const refresh = () => { void qc.invalidateQueries({ queryKey: ["payroll-attendance"] }); void qc.invalidateQueries({ queryKey: ["payroll-employee-detail"] }); void qc.invalidateQueries({ queryKey: ["payroll-analytics"] }); };
 
@@ -95,7 +118,7 @@ export function PayrollAttendance({ canManage }: { canManage: boolean }) {
       {/* Controls */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="inline-flex rounded-lg border border-border bg-muted/40 p-0.5">
-          {(["day", "week", "month"] as Mode[]).map((m) => (
+          {(["day", "week", "month", "year"] as Mode[]).map((m) => (
             <button key={m} type="button" onClick={() => setMode(m)}
               className={cn("rounded-md px-3 py-1 text-xs font-medium capitalize transition-colors", mode === m ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground")}>
               {m}
@@ -105,7 +128,7 @@ export function PayrollAttendance({ canManage }: { canManage: boolean }) {
         <div className="flex items-center gap-1.5">
           <Button variant="outline" size="sm" onClick={() => setAnchor(new Date())}><CalendarDays /> Today</Button>
           <Button variant="ghost" size="icon" className="size-8" aria-label="Previous" onClick={() => shift(-1)}><ChevronLeft className="size-4" /></Button>
-          <span className="min-w-40 text-center text-sm font-medium">{rangeLabel(mode, keys)}</span>
+          <span className="min-w-40 text-center text-sm font-medium">{isYear ? String(year) : rangeLabel(mode, keys)}</span>
           <Button variant="ghost" size="icon" className="size-8" aria-label="Next" onClick={() => shift(1)}><ChevronRight className="size-4" /></Button>
         </div>
       </div>
@@ -129,6 +152,54 @@ export function PayrollAttendance({ canManage }: { canManage: boolean }) {
         <div className="rounded-lg border border-border"><ErrorState description={q.error instanceof Error ? q.error.message : "Failed to load"} /></div>
       ) : employees.length === 0 ? (
         <div className="rounded-xl border border-dashed border-border p-10 text-center text-sm text-muted-foreground">No employees to show.</div>
+      ) : isYear ? (
+        <div className="overflow-x-auto rounded-xl border border-border">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="border-b border-border bg-muted/30">
+                <th className="sticky left-0 z-10 bg-muted/30 px-3 py-2 text-left font-medium backdrop-blur">Employee</th>
+                {MONTHS.map((m, i) => (
+                  <th key={i} className="px-1 py-2 text-center text-xs font-medium">{m.slice(0, 3)}</th>
+                ))}
+                <th className="px-2 py-2 text-right text-xs font-medium">Worked</th>
+              </tr>
+            </thead>
+            <tbody>
+              {employees.map((emp) => {
+                const months = yearAgg.get(emp.id) ?? Array.from({ length: 12 }, () => ({ worked: 0, absent: 0, leave: 0 }));
+                const total = months.reduce((s, mo) => s + mo.worked, 0);
+                return (
+                  <tr key={emp.id} className="border-b border-border/60 last:border-0">
+                    <td className="sticky left-0 z-10 max-w-[180px] truncate bg-background px-3 py-1.5 font-medium">
+                      {emp.full_name}
+                      <span className="ml-1.5 font-mono text-[10px] text-muted-foreground">{emp.employee_code}</span>
+                    </td>
+                    {months.map((mo, mi) => {
+                      const has = mo.worked + mo.absent + mo.leave > 0;
+                      return (
+                        <td key={mi} className="p-1 text-center">
+                          <button
+                            type="button"
+                            onClick={() => drillToMonth(mi)}
+                            title={`${MONTHS[mi]} — ${mo.worked} worked, ${mo.absent} absent, ${mo.leave} leave`}
+                            className={cn(
+                              "flex w-full flex-col items-center rounded px-1 py-1 transition-colors hover:bg-muted",
+                              has && "bg-emerald-500/10",
+                            )}
+                          >
+                            <span className={cn("text-xs font-semibold tabular-nums", has ? "text-emerald-600 dark:text-emerald-400" : "text-muted-foreground/40")}>{has ? mo.worked : "·"}</span>
+                            {mo.absent > 0 ? <span className="text-[10px] tabular-nums text-red-600 dark:text-red-400">{mo.absent}a</span> : null}
+                          </button>
+                        </td>
+                      );
+                    })}
+                    <td className="px-2 py-1.5 text-right text-xs font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">{total}d</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       ) : (
         <div className="overflow-x-auto rounded-xl border border-border">
           <table className="w-full border-collapse text-sm">

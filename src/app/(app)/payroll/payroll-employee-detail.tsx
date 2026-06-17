@@ -19,7 +19,8 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { ErrorState } from "@/components/states";
 import { formatDate, formatMoney, toDateKey } from "@/lib/format";
-import { saveAttendanceAction } from "@/lib/payroll/actions";
+import { setAttendanceDayAction } from "@/lib/payroll/actions";
+import { ATTENDANCE_STATUSES, attendanceStatusMeta, type AttendanceStatus } from "@/lib/payroll/attendance";
 import { employeeStatusMeta, employmentTypeMeta, runStatusMeta } from "@/lib/payroll/formulas";
 import type { EmployeeDetailData, EmployeeListRow } from "@/lib/payroll/types";
 
@@ -118,24 +119,32 @@ export function EmployeeDetail({
             </CardContent>
           </Card>
 
-          {/* Attendance history */}
+          {/* Recent daily attendance */}
           <Card>
-            <CardHeader className="pb-2"><CardTitle className="text-base">Attendance</CardTitle></CardHeader>
-            <CardContent className="space-y-2">
-              {d.attendance.length === 0 ? (
-                <p className="py-6 text-center text-sm text-muted-foreground">No attendance recorded.</p>
+            <CardHeader className="pb-2"><CardTitle className="text-base">Recent attendance</CardTitle></CardHeader>
+            <CardContent>
+              {d.attendanceDays.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">No attendance recorded. Mark days in the Attendance tab or via “Record attendance”.</p>
               ) : (
-                d.attendance.map((a) => (
-                  <div key={a.id} className="flex items-center justify-between gap-2 border-b border-border/60 pb-2 text-sm last:border-0 last:pb-0">
-                    <span className="font-medium">{formatDate(a.period_month, "MMM yyyy")}</span>
-                    <span className="flex flex-wrap justify-end gap-x-3 text-xs tabular-nums text-muted-foreground">
-                      <span>{a.days_worked}d</span>
-                      {a.overtime_hours > 0 ? <span className="text-amber-600 dark:text-amber-400">{a.overtime_hours}h OT</span> : null}
-                      {a.leave_days_unpaid > 0 ? <span>{a.leave_days_unpaid} unpaid</span> : null}
-                      {a.absences > 0 ? <span className="text-red-600 dark:text-red-400">{a.absences} abs</span> : null}
-                    </span>
-                  </div>
-                ))
+                <ul className="max-h-64 space-y-1.5 overflow-y-auto pr-1" role="list">
+                  {d.attendanceDays.map((a) => {
+                    const m = attendanceStatusMeta(a.status);
+                    return (
+                      <li key={a.id} className="flex items-center justify-between gap-2 text-sm">
+                        <span className="flex items-center gap-2">
+                          <span className={cn("inline-flex size-5 shrink-0 items-center justify-center rounded text-[10px] font-bold ring-1 ring-inset", badgeClass(m.color))}>{m.short}</span>
+                          <span className="font-medium tabular-nums">{formatDate(a.work_date, "EEE, MMM d")}</span>
+                          <span className="text-muted-foreground">{m.label}</span>
+                        </span>
+                        <span className="flex shrink-0 items-center gap-2 text-xs tabular-nums text-muted-foreground">
+                          {a.hours_worked > 0 ? <span>{a.hours_worked}h</span> : null}
+                          {a.overtime_hours > 0 ? <span className="text-amber-600 dark:text-amber-400">+{a.overtime_hours}h OT</span> : null}
+                          {a.note ? <span className="max-w-28 truncate italic" title={a.note}>“{a.note}”</span> : null}
+                        </span>
+                      </li>
+                    );
+                  })}
+                </ul>
               )}
             </CardContent>
           </Card>
@@ -194,29 +203,23 @@ function AttendanceDialog({
   employeeName: string;
   onSaved: () => void;
 }) {
-  const [periodMonth, setPeriodMonth] = useState(`${toDateKey(0).slice(0, 7)}-01`);
-  const [daysWorked, setDaysWorked] = useState("22");
-  const [hoursWorked, setHoursWorked] = useState("");
-  const [overtimeHours, setOvertimeHours] = useState("");
-  const [leavePaid, setLeavePaid] = useState("");
-  const [leaveUnpaid, setLeaveUnpaid] = useState("");
-  const [absences, setAbsences] = useState("");
-  const [notes, setNotes] = useState("");
+  const [workDate, setWorkDate] = useState(toDateKey(0));
+  const [status, setStatus] = useState<AttendanceStatus>("present");
+  const [hours, setHours] = useState("8");
+  const [ot, setOt] = useState("0");
+  const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
 
   async function save() {
     setBusy(true);
     try {
-      const res = await saveAttendanceAction({
+      const res = await setAttendanceDayAction({
         employeeId,
-        periodMonth,
-        daysWorked: Number(daysWorked) || 0,
-        hoursWorked: Number(hoursWorked) || 0,
-        overtimeHours: Number(overtimeHours) || 0,
-        leaveDaysPaid: Number(leavePaid) || 0,
-        leaveDaysUnpaid: Number(leaveUnpaid) || 0,
-        absences: Number(absences) || 0,
-        notes: notes.trim(),
+        workDate,
+        status,
+        hours: Number(hours) || 0,
+        overtime: Number(ot) || 0,
+        note: note.trim(),
       });
       if (res.ok) { toast.success("Attendance saved"); onOpenChange(false); onSaved(); }
       else toast.error(res.error);
@@ -228,17 +231,36 @@ function AttendanceDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Record attendance — {employeeName}</DialogTitle>
-          <DialogDescription>One record per month; saving again updates the period. Editable until the period’s run is approved.</DialogDescription>
+          <DialogDescription>Mark this employee’s status for a single day. Saving again updates that day.</DialogDescription>
         </DialogHeader>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <div className="space-y-1.5"><Label htmlFor="att-period">Period (month)</Label><Input id="att-period" type="date" value={periodMonth} onChange={(e) => setPeriodMonth(`${e.target.value.slice(0, 7)}-01`)} /></div>
-          <div className="space-y-1.5"><Label htmlFor="att-days">Days worked</Label><Input id="att-days" type="number" min={0} max={31} value={daysWorked} onChange={(e) => setDaysWorked(e.target.value)} className="tabular-nums" /></div>
-          <div className="space-y-1.5"><Label htmlFor="att-hours">Hours worked</Label><Input id="att-hours" type="number" min={0} value={hoursWorked} placeholder="0" onChange={(e) => setHoursWorked(e.target.value)} className="tabular-nums" /></div>
-          <div className="space-y-1.5"><Label htmlFor="att-ot">Overtime hours</Label><Input id="att-ot" type="number" min={0} value={overtimeHours} placeholder="0" onChange={(e) => setOvertimeHours(e.target.value)} className="tabular-nums" /></div>
-          <div className="space-y-1.5"><Label htmlFor="att-lp">Paid leave (days)</Label><Input id="att-lp" type="number" min={0} value={leavePaid} placeholder="0" onChange={(e) => setLeavePaid(e.target.value)} className="tabular-nums" /></div>
-          <div className="space-y-1.5"><Label htmlFor="att-lu">Unpaid leave (days)</Label><Input id="att-lu" type="number" min={0} value={leaveUnpaid} placeholder="0" onChange={(e) => setLeaveUnpaid(e.target.value)} className="tabular-nums" /></div>
-          <div className="space-y-1.5"><Label htmlFor="att-abs">Absences (days)</Label><Input id="att-abs" type="number" min={0} value={absences} placeholder="0" onChange={(e) => setAbsences(e.target.value)} className="tabular-nums" /></div>
-          <div className="space-y-1.5 sm:col-span-2"><Label htmlFor="att-notes">Notes</Label><Textarea id="att-notes" value={notes} maxLength={1000} rows={2} placeholder="Optional" onChange={(e) => setNotes(e.target.value)} /></div>
+        <div className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="att-date">Date</Label>
+            <Input id="att-date" type="date" value={workDate} onChange={(e) => setWorkDate(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Status</Label>
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              {ATTENDANCE_STATUSES.map((s) => {
+                const m = attendanceStatusMeta(s);
+                return (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => { setStatus(s); if (s === "absent" || s === "leave_paid" || s === "leave_unpaid" || s === "holiday") setHours("0"); else if (s === "half_day") setHours("4"); else setHours("8"); }}
+                    className={cn("inline-flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium ring-1 ring-inset transition", status === s ? badgeClass(m.color) : "text-muted-foreground ring-border hover:bg-muted")}
+                  >
+                    <span className="font-bold">{m.short}</span> {m.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5"><Label htmlFor="att-h">Hours</Label><Input id="att-h" type="number" min={0} max={24} value={hours} onChange={(e) => setHours(e.target.value)} className="tabular-nums" /></div>
+            <div className="space-y-1.5"><Label htmlFor="att-o">Overtime (h)</Label><Input id="att-o" type="number" min={0} max={24} value={ot} onChange={(e) => setOt(e.target.value)} className="tabular-nums" /></div>
+          </div>
+          <div className="space-y-1.5"><Label htmlFor="att-note">Note</Label><Textarea id="att-note" value={note} maxLength={500} rows={2} placeholder="Optional" onChange={(e) => setNote(e.target.value)} /></div>
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>Cancel</Button>

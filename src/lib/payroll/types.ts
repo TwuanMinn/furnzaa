@@ -193,6 +193,15 @@ export interface AttendanceHistoryRow {
   absences: number;
 }
 
+export interface AttendanceDayHistoryRow {
+  id: string;
+  work_date: string;
+  status: string;
+  hours_worked: number;
+  overtime_hours: number;
+  note: string | null;
+}
+
 export interface EmployeePayItemRow {
   id: string;
   period_month: string;
@@ -220,5 +229,6 @@ export interface EmployeeDetailData {
   };
   salaryStructures: SalaryStructureHistoryRow[];
   attendance: AttendanceHistoryRow[];
+  attendanceDays: AttendanceDayHistoryRow[];
   payItems: EmployeePayItemRow[];
 }
