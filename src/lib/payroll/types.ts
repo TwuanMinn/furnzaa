@@ -167,3 +167,58 @@ export interface PayrollData {
   byDepartment: PayrollDeptBreakdown[];
   topEarners: { name: string; netCents: number }[];
 }
+
+// ── Employee detail (salary history + attendance + payslip history) ──────────
+
+export interface SalaryStructureHistoryRow {
+  id: string;
+  effective_from: string;
+  pay_basis: string;
+  base_salary_cents: number;
+  hourly_rate_cents: number;
+  overtime_rate_cents: number;
+  standard_working_days: number;
+  recurring_allowances: { label: string; amount_cents: number; taxable: boolean }[];
+  recurring_deductions: { label: string; amount_cents: number; pre_tax: boolean }[];
+}
+
+export interface AttendanceHistoryRow {
+  id: string;
+  period_month: string;
+  days_worked: number;
+  hours_worked: number;
+  overtime_hours: number;
+  leave_days_paid: number;
+  leave_days_unpaid: number;
+  absences: number;
+}
+
+export interface EmployeePayItemRow {
+  id: string;
+  period_month: string;
+  run_status: string;
+  gross_cents: number;
+  total_deductions_cents: number;
+  net_cents: number;
+  status: string;
+}
+
+export interface EmployeeDetailData {
+  employee: {
+    id: string;
+    employee_code: string;
+    full_name: string;
+    position: string;
+    department_name: string | null;
+    department_color: string | null;
+    employment_type: string;
+    status: string;
+    hire_date: string | null;
+    email: string | null;
+    phone: string | null;
+    bank_masked: string | null;
+  };
+  salaryStructures: SalaryStructureHistoryRow[];
+  attendance: AttendanceHistoryRow[];
+  payItems: EmployeePayItemRow[];
+}

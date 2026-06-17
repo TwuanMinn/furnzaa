@@ -22,6 +22,7 @@ import { toDateKey } from "@/lib/format";
 import { createEmployeeAction, updateEmployeeAction, addSalaryStructureAction } from "@/lib/payroll/actions";
 import { EMPLOYEE_STATUSES, EMPLOYMENT_TYPES, type EmployeeListRow } from "@/lib/payroll/types";
 import { employeeStatusMeta, employmentTypeMeta } from "@/lib/payroll/formulas";
+import { EmployeeDetail } from "./payroll-employee-detail";
 
 export type Ref = { id: string; name: string };
 const NONE = "__none__";
@@ -45,10 +46,12 @@ export function PayrollEmployees({
   const [editing, setEditing] = useState<EmployeeListRow | null>(null);
   const [creating, setCreating] = useState(false);
   const [salaryFor, setSalaryFor] = useState<EmployeeListRow | null>(null);
+  const [detail, setDetail] = useState<EmployeeListRow | null>(null);
 
   const refresh = () => {
     void qc.invalidateQueries({ queryKey: ["/api/payroll/employees"] });
     void qc.invalidateQueries({ queryKey: ["payroll-analytics"] });
+    void qc.invalidateQueries({ queryKey: ["payroll-employee-detail"] });
   };
 
   const filterDefs: FilterDef[] = useMemo(
@@ -81,8 +84,8 @@ export function PayrollEmployees({
           id: "actions", header: "", align: "right" as const,
           cell: (r: EmployeeListRow) => (
             <div className="flex justify-end gap-1">
-              <Button size="icon-sm" variant="ghost" aria-label={`Set salary for ${r.full_name}`} onClick={() => setSalaryFor(r)}><Coins className="text-muted-foreground" /></Button>
-              <Button size="icon-sm" variant="ghost" aria-label={`Edit ${r.full_name}`} onClick={() => setEditing(r)}><Pencil className="text-muted-foreground" /></Button>
+              <Button size="icon-sm" variant="ghost" aria-label={`Set salary for ${r.full_name}`} onClick={(e) => { e.stopPropagation(); setSalaryFor(r); }}><Coins className="text-muted-foreground" /></Button>
+              <Button size="icon-sm" variant="ghost" aria-label={`Edit ${r.full_name}`} onClick={(e) => { e.stopPropagation(); setEditing(r); }}><Pencil className="text-muted-foreground" /></Button>
             </div>
           ),
         }]
@@ -91,18 +94,30 @@ export function PayrollEmployees({
 
   return (
     <>
-      <DataTable
-        table={table}
-        columns={columns}
-        getRowId={(r) => r.id}
-        filterDefs={filterDefs}
-        searchPlaceholder="Search name or code…"
-        exportDataset="payroll-employees"
-        emptyTitle="No employees yet"
-        emptyDescription={canManage ? "Add your first employee to start running payroll." : undefined}
-        emptyIcon={Users}
-        toolbar={canManage ? <Button size="sm" onClick={() => setCreating(true)}><Plus /> New employee</Button> : undefined}
-      />
+      {detail ? (
+        <EmployeeDetail
+          employee={detail}
+          currency={_currency}
+          canManage={canManage}
+          onBack={() => setDetail(null)}
+          onSetSalary={() => setSalaryFor(detail)}
+          onEdit={() => setEditing(detail)}
+        />
+      ) : (
+        <DataTable
+          table={table}
+          columns={columns}
+          getRowId={(r) => r.id}
+          filterDefs={filterDefs}
+          searchPlaceholder="Search name or code…"
+          exportDataset="payroll-employees"
+          onRowClick={(r) => setDetail(r)}
+          emptyTitle="No employees yet"
+          emptyDescription={canManage ? "Add your first employee to start running payroll." : undefined}
+          emptyIcon={Users}
+          toolbar={canManage ? <Button size="sm" onClick={() => setCreating(true)}><Plus /> New employee</Button> : undefined}
+        />
+      )}
       {canManage ? (
         <>
           <EmployeeDialog open={creating} onOpenChange={setCreating} departments={departments} onSaved={refresh} />
