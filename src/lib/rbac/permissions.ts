@@ -33,6 +33,7 @@ export type PermissionModule =
   | "logs"
   | "analytics"
   | "roi"
+  | "payroll"
   | "settings";
 
 export interface PermissionDef {
@@ -102,6 +103,17 @@ export const PERMISSIONS = [
   { key: "roi.delete", module: "roi", description: "Delete investments and ledger entries" },
   { key: "roi.manage", module: "roi", description: "Manage ROI categories, projects and config" },
 
+  { key: "payroll.view_all", module: "payroll", description: "View & manage all payroll" },
+  { key: "payroll.view_own", module: "payroll", description: "View own payslips (self-service)" },
+  { key: "payroll.manage", module: "payroll", description: "Manage employees & salary structures" },
+  { key: "attendance.manage", module: "payroll", description: "Record attendance" },
+  { key: "payroll.run", module: "payroll", description: "Calculate payroll runs" },
+  { key: "payroll.approve", module: "payroll", description: "Approve payroll runs" },
+  { key: "payroll.pay", module: "payroll", description: "Mark payroll runs paid" },
+  { key: "payslip.generate", module: "payroll", description: "Generate payslips" },
+  { key: "payroll.analytics_view", module: "payroll", description: "View salary-cost analytics" },
+  { key: "payroll.config", module: "payroll", description: "Edit payroll / HR configuration" },
+
   { key: "crm.view", module: "crm", description: "View customer segments, tiers & rank history" },
   { key: "crm.manage_tiers", module: "crm", description: "Configure tiers, benefits & manual overrides" },
   { key: "vouchers.view", module: "crm", description: "View vouchers & redemptions" },
@@ -150,6 +162,7 @@ export const PERMISSIONS = [
   { key: "settings.edit_data", module: "settings", description: "Manage data import/export/retention" },
   { key: "settings.edit_security", module: "settings", description: "Edit security settings" },
   { key: "settings.edit_roi", module: "settings", description: "Edit ROI / investment configuration" },
+  { key: "settings.edit_payroll", module: "settings", description: "Edit payroll / HR configuration" },
 ] as const satisfies readonly PermissionDef[];
 
 export type PermissionKey = (typeof PERMISSIONS)[number]["key"];
@@ -221,6 +234,7 @@ const STAFF_PERMS: PermissionKey[] = [
   "messages.send",
   "logs.view",
   "analytics.view",
+  "payroll.view_own",
 ];
 
 export const ROLE_PERMISSIONS: Record<RoleKey, PermissionKey[] | "*"> = {

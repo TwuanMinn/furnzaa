@@ -270,6 +270,34 @@ export const investmentRefSchema = z.object({
 });
 export type InvestmentRefInput = z.infer<typeof investmentRefSchema>;
 
+// ── Payroll / HR configuration ────────────────────────────────────────────────
+
+/** A department row (shared with User Management + Payroll analytics). */
+export const departmentRefSchema = z.object({
+  id: z.string().uuid().optional(),
+  name: z.string().trim().min(1, "Name is required").max(80),
+  color: z.string().trim().min(1).max(20),
+});
+export type DepartmentRefInput = z.infer<typeof departmentRefSchema>;
+
+/** A tax profile: none | flat % of taxable base | fixed amount. */
+export const taxProfileSchema = z.object({
+  id: z.string().uuid().optional(),
+  name: z.string().trim().min(1, "Name is required").max(80),
+  kind: z.enum(["none", "flat", "fixed"]),
+  ratePercent: z.coerce.number().min(0, "Cannot be negative").max(100, "Max 100%").default(0),
+  fixedAmount: z.coerce.number().min(0).max(1e13).default(0),
+});
+export type TaxProfileInput = z.infer<typeof taxProfileSchema>;
+
+/** An employer-side contribution: flat % of gross. */
+export const employerProfileSchema = z.object({
+  id: z.string().uuid().optional(),
+  name: z.string().trim().min(1, "Name is required").max(80),
+  ratePercent: z.coerce.number().min(0, "Cannot be negative").max(100, "Max 100%").default(0),
+});
+export type EmployerProfileInput = z.infer<typeof employerProfileSchema>;
+
 // ── Messaging configuration ───────────────────────────────────────────────────
 
 export const messagingConfigSchema = z.object({

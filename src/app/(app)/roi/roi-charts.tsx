@@ -49,11 +49,11 @@ function ChartCard({
   const reduce = useReducedMotion();
   return (
     <motion.div
-      initial={reduce ? false : { opacity: 0, y: 12 }}
+      initial={reduce ? false : { opacity: 0, y: 14 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.35, ease: "easeOut", delay: reduce ? 0 : 0.1 + index * 0.08 }}
+      transition={{ type: "spring", stiffness: 220, damping: 24, delay: reduce ? 0 : 0.1 + index * 0.08 }}
     >
-      <Card>
+      <Card className="transition-shadow duration-300 hover:shadow-md hover:shadow-black/[0.04] dark:hover:shadow-black/20">
         <CardHeader className="pb-2">
           <CardTitle className="text-base">{title}</CardTitle>
           {subtitle ? <p className="text-xs text-muted-foreground">{subtitle}</p> : null}
@@ -147,8 +147,8 @@ export function RoiCharts({
                   label={{ value: "Break-even", position: "insideTopRight", fontSize: 10, fill: RECOVERED }}
                 />
               ) : null}
-              <Area type="monotone" dataKey="invested" stroke={INVESTED} fill="url(#roiInvested)" strokeWidth={2} isAnimationActive={!reduce} animationDuration={500} />
-              <Area type="monotone" dataKey="recovered" stroke={RECOVERED} fill="url(#roiRecovered)" strokeWidth={2} isAnimationActive={!reduce} animationDuration={500} />
+              <Area type="monotone" dataKey="invested" stroke={INVESTED} fill="url(#roiInvested)" strokeWidth={2} isAnimationActive={!reduce} animationEasing="ease-out" animationDuration={650} />
+              <Area type="monotone" dataKey="recovered" stroke={RECOVERED} fill="url(#roiRecovered)" strokeWidth={2.25} isAnimationActive={!reduce} animationEasing="ease-out" animationBegin={reduce ? 0 : 180} animationDuration={750} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -169,7 +169,7 @@ export function RoiCharts({
                   contentStyle={TOOLTIP_STYLE}
                 />
                 <ReferenceLine y={0} stroke="currentColor" opacity={0.3} />
-                <Bar dataKey="monthlyProfit" radius={[4, 4, 0, 0]} isAnimationActive={!reduce} animationDuration={500}>
+                <Bar dataKey="monthlyProfit" radius={[4, 4, 0, 0]} isAnimationActive={!reduce} animationEasing="ease-out" animationDuration={650}>
                   {chartData.map((d, i) => (
                     <Cell key={i} fill={d.monthlyProfit >= 0 ? RECOVERED : LOSS} />
                   ))}
@@ -193,7 +193,7 @@ export function RoiCharts({
                   contentStyle={TOOLTIP_STYLE}
                 />
                 <ReferenceLine y={0} stroke="currentColor" strokeDasharray="4 4" opacity={0.4} />
-                <Line type="monotone" dataKey="roi" stroke={ROI_LINE} strokeWidth={2} dot={false} isAnimationActive={!reduce} animationDuration={600} />
+                <Line type="monotone" dataKey="roi" stroke={ROI_LINE} strokeWidth={2.25} dot={false} isAnimationActive={!reduce} animationEasing="ease-out" animationDuration={800} />
               </LineChart>
             </ResponsiveContainer>
           </div>

@@ -37,6 +37,7 @@ export default async function Page({
     showOrg("settings.edit_trending") ||
     showOrg("settings.edit_feedback") ||
     showOrg("settings.edit_roi") ||
+    showOrg("settings.edit_payroll") ||
     showOrg("settings.edit_messaging") ||
     showOrg("settings.edit_inventory") ||
     showOrg("settings.edit_loyalty") ||
@@ -244,6 +245,28 @@ export default async function Page({
           projects: asRows<{ id: string; name: string; color: string; is_active: boolean }>(
             roiProjsRes.data,
           ).map((p) => ({ id: p.id, name: p.name, color: p.color, isActive: p.is_active })),
+        },
+      };
+    }
+    if (showOrg("settings.edit_payroll")) {
+      const [deptRes, taxRes, erRes] = await Promise.all([
+        supabase.from("departments").select("id, name, color, is_active").is("deleted_at", null).order("sort_order").order("name").limit(200),
+        supabase.from("tax_profiles").select("id, name, kind, rate_percent, fixed_cents, is_active").is("deleted_at", null).order("name").limit(200),
+        supabase.from("employer_contribution_profiles").select("id, name, rate_percent, is_active").is("deleted_at", null).order("name").limit(200),
+      ]);
+      bundle.payroll = {
+        canEdit: editable("settings.edit_payroll"),
+        data: {
+          currency: org.currency,
+          departments: asRows<{ id: string; name: string; color: string; is_active: boolean }>(deptRes.data).map(
+            (d) => ({ id: d.id, name: d.name, color: d.color, isActive: d.is_active }),
+          ),
+          taxProfiles: asRows<{ id: string; name: string; kind: string; rate_percent: number; fixed_cents: number; is_active: boolean }>(taxRes.data).map(
+            (t) => ({ id: t.id, name: t.name, kind: (t.kind as "none" | "flat" | "fixed") ?? "none", ratePercent: Number(t.rate_percent), fixedAmount: t.fixed_cents / 100, isActive: t.is_active }),
+          ),
+          employerProfiles: asRows<{ id: string; name: string; rate_percent: number; is_active: boolean }>(erRes.data).map(
+            (e) => ({ id: e.id, name: e.name, ratePercent: Number(e.rate_percent), isActive: e.is_active }),
+          ),
         },
       };
     }

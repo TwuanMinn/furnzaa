@@ -21,6 +21,7 @@ import {
   Shield,
   Star,
   UserCog,
+  Wallet,
 } from "lucide-react";
 import { TableSkeleton } from "@/components/states";
 import type { SectionId, SettingsBundle } from "./sections/types";
@@ -67,6 +68,10 @@ const RoiSection = dynamic(
   () => import("./sections/roi-section").then((m) => m.RoiSection),
   { loading: sectionLoading },
 );
+const PayrollSection = dynamic(
+  () => import("./sections/payroll-section").then((m) => m.PayrollSection),
+  { loading: sectionLoading },
+);
 const MessagingSection = dynamic(
   () => import("./sections/messaging-section").then((m) => m.MessagingSection),
   { loading: sectionLoading },
@@ -108,6 +113,7 @@ const SECTION_META: {
   { id: "trending", label: "Trending", icon: Flame, group: "Organization" },
   { id: "feedback", label: "Feedback", icon: MessageSquareWarning, group: "Organization" },
   { id: "roi", label: "ROI & Investment", icon: PiggyBank, group: "Organization" },
+  { id: "payroll", label: "Payroll & HR", icon: Wallet, group: "Organization" },
   { id: "messaging", label: "Messaging", icon: MessagesSquare, group: "Organization" },
   { id: "inventory", label: "Inventory", icon: Package, group: "Organization" },
   { id: "loyalty", label: "Loyalty", icon: Star, group: "Organization" },
@@ -230,6 +236,9 @@ export function SettingsClient({
             )}
             {active === "roi" && bundle.roi && (
               <RoiSection data={bundle.roi.data} canEdit={bundle.roi.canEdit} />
+            )}
+            {active === "payroll" && bundle.payroll && (
+              <PayrollSection data={bundle.payroll.data} canEdit={bundle.payroll.canEdit} />
             )}
             {active === "messaging" && bundle.messaging && (
               <MessagingSection

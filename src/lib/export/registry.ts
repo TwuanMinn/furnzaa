@@ -15,6 +15,9 @@ import { trendsExportDataset } from "@/lib/datasets/trends";
 import { feedbackExportDataset } from "@/lib/datasets/feedback";
 import { roiInvestmentsExportDataset } from "@/lib/datasets/roi-investments";
 import { roiMonthlyExportDataset } from "@/lib/datasets/roi-monthly";
+import { employeesExportDataset } from "@/lib/datasets/payroll-employees";
+import { payrollRunsExportDataset } from "@/lib/datasets/payroll-runs";
+import { payrollItemsExportDataset } from "@/lib/datasets/payroll-items";
 
 /**
  * Every exportable dataset, keyed by slug. The export route and print view
@@ -38,6 +41,9 @@ const EXPORT_DATASETS: Record<string, ExportDataset<never>> = {
   feedback: feedbackExportDataset as unknown as ExportDataset<never>,
   "roi-investments": roiInvestmentsExportDataset as unknown as ExportDataset<never>,
   "roi-monthly": roiMonthlyExportDataset as unknown as ExportDataset<never>,
+  "payroll-employees": employeesExportDataset as unknown as ExportDataset<never>,
+  "payroll-runs": payrollRunsExportDataset as unknown as ExportDataset<never>,
+  "payroll-items": payrollItemsExportDataset as unknown as ExportDataset<never>,
 };
 
 export function getExportDataset(slug: string): ExportDataset<never> | null {
