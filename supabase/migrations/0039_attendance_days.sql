@@ -142,31 +142,6 @@ $$;
 grant execute on function public.delete_attendance_day(uuid) to authenticated, service_role;
 revoke execute on function public.delete_attendance_day(uuid) from public, anon;
 
--- ── 5. Demo seed (best-effort: only if employees already exist) ───────────────
-do $$
-declare e record; d date;
-begin
-  if exists (select 1 from public.employees where deleted_at is null) then
-    for e in select id from public.employees where deleted_at is null limit 50 loop
-      for d in
-        select gs::date from generate_series(date '2026-06-01', date '2026-06-20', interval '1 day') gs
-        where extract(dow from gs) between 1 and 5
-      loop
-        insert into public.attendance_days (employee_id, work_date, status, hours_worked, overtime_hours)
-        values (
-          e.id, d,
-          case when d = date '2026-06-05' then 'absent'
-               when d = date '2026-06-09' then 'leave_paid'
-               when d = date '2026-06-16' then 'remote'
-               else 'present' end,
-          case when d in (date '2026-06-05', date '2026-06-09') then 0 else 8 end,
-          case when extract(day from d)::int % 7 = 0 then 2 else 0 end
-        )
-        on conflict (employee_id, work_date) do nothing;
-      end loop;
-      perform public.payroll_recompute_attendance_month(e.id, date '2026-06-01');
-    end loop;
-  end if;
-end $$;
+-- ── 5. No demo seed — attendance is entered by managers in the Attendance tab. ─
 
 notify pgrst, 'reload schema';
